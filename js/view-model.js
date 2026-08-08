@@ -350,20 +350,40 @@ function disposeEntry(entry) {
 
 /* ── camera ──────────────────────────────────────────────────────────────── */
 
+/** Distance at which the perspective camera frames the whole model. */
+function perspDistance(radius) {
+  const aspect = (host.clientWidth || 1) / (host.clientHeight || 1);
+  const vFov = THREE.MathUtils.degToRad(persp.fov);
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
+  return Math.max(radius / Math.sin(vFov / 2), radius / Math.sin(hFov / 2)) * PAD;
+}
+
 function frameTo(presetName) {
   if (!root) return;
   const { az, el } = PRESETS[presetName] || PRESETS.iso;
   const box = new THREE.Box3().setFromObject(root);
   const sphere = box.getBoundingSphere(new THREE.Sphere());
   const target = box.getCenter(new THREE.Vector3());
-  const dist = Math.max(sphere.radius * 4, 1);
+  const dir = dirVector(az, el);
+  const radius = Math.max(sphere.radius, 0.001);
 
+  // Orthographic framing comes from the frustum extents, so the camera only
+  // has to stand far enough back to clear the scene. Perspective framing IS
+  // the distance, so it gets its own fov-derived one.
+  ortho.position.copy(target).addScaledVector(dir, Math.max(radius * 4, 1));
+  persp.position.copy(target).addScaledVector(dir, perspDistance(radius));
   for (const cam of [ortho, persp]) {
-    cam.position.copy(target).addScaledVector(dirVector(az, el), dist);
     cam.zoom = 1;
     cam.lookAt(target);
   }
   controls.target.copy(target);
+
+  // Let the user dolly in close without falling through the model, and stop
+  // them flying off into the empty ground plane.
+  controls.minDistance = radius * 0.15;
+  controls.maxDistance = radius * 20;
+  controls.minZoom = 0.2;
+  controls.maxZoom = 60;
 
   fitShadow(sphere);
   applyFrustum();
@@ -433,33 +453,41 @@ function applyFrustum() {
     ortho.far = sceneR * 4;
     ortho.updateProjectionMatrix();
   } else {
-    const vFov = THREE.MathUtils.degToRad(persp.fov);
-    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
-    const r = sphere.radius;
-    const dist = Math.max(r / Math.sin(vFov / 2), r / Math.sin(hFov / 2)) * PAD;
-    const dir = persp.position.clone().sub(controls.target).normalize();
-    persp.position.copy(controls.target).addScaledVector(dir, dist);
-    persp.updateMatrixWorld(true);
-
+    // Never move the camera here — this runs on every resize, and dollying it
+    // back to a "fitted" distance would throw away the user's zoom. Framing is
+    // frameTo()'s job; this only keeps the projection honest.
     persp.aspect = aspect;
-    // Keep near tied to the model so depth precision stays usable, but push
-    // far out past the ground plane.
-    persp.near = Math.max(dist * 0.01, dist - r * 2);
-    persp.far = dist + sceneR * 2.5;
+    // near must stay well inside the closest the user can dolly to, or zooming
+    // in simply pushes the model through the near plane and it vanishes.
+    persp.near = Math.max(0.01, sphere.radius * 0.02);
+    // Reach past the furthest the user can dolly out to, so far never clips.
+    persp.far = sphere.radius * 20 + sceneR * 2.5;
     persp.updateProjectionMatrix();
   }
 }
 
 function setProjection(toOrtho) {
   if (toOrtho === (camera === ortho)) return;
+
   const target = controls.target.clone();
+  // Carry the direction you are currently looking from over to the other
+  // camera, otherwise it wakes up wherever it was last left.
+  const dir = camera.position.clone().sub(target).normalize();
+  const radius = root
+    ? Math.max(new THREE.Box3().setFromObject(root)
+        .getBoundingSphere(new THREE.Sphere()).radius, 0.001)
+    : 1;
+
   camera = toOrtho ? ortho : persp;
   useOrtho = toOrtho;
   save(CONFIG.LS_PROJECTION, toOrtho ? 'ortho' : 'persp');
 
+  camera.position.copy(target)
+    .addScaledVector(dir, toOrtho ? Math.max(radius * 4, 1) : perspDistance(radius));
+  camera.lookAt(target);
+
   controls.object = camera;
   controls.target.copy(target);
-  camera.lookAt(target);
   applyFrustum();
   controls.update();
   syncToggles();
