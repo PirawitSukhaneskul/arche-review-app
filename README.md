@@ -59,29 +59,36 @@ hatched placeholder showing the sheet number, so the grid never breaks.
 
 ### Where the thumbnails came from
 
-Each option sheet in the deck embeds its **3D MASSING** view as a standalone
-~500×330 PNG in the bottom-left corner, already on a transparent background.
-Those are extracted directly — no screenshotting, no re-rendering — and fitted
-into the 480×310 frame with transparent padding so nothing is distorted or
-cropped.
+Each option sheet carries a **3D MASSING** view in its bottom-left corner. The
+thumbnails are that block, rendered at 300 dpi and cropped, on white.
+
+> Do **not** extract the embedded image XObject instead. Its transparency lives
+> in a separate PDF soft-mask, so `extract_image()` hands back the base image
+> with every see-through area filled black. Rendering the page composites the
+> mask properly.
 
 ```python
-import io, pymupdf
+import pymupdf
 from PIL import Image
 
-doc = pymupdf.open('Arche_Aquatics_Meeting1_6Layouts.pdf')
-for opt, page_no in {1: 4, 2: 5, 3: 6, 4: 7, 5: 8, 6: 9}.items():
+for opt in range(1, 7):
+    page = pymupdf.open(f'assets/meeting-1/plans/opt-{opt}.pdf')[0]
     # the one big raster placed in the bottom-left block
-    xref = next(
-        i['xref'] for i in doc[page_no - 1].get_image_info(xrefs=True)
+    x0, y0, x1, y1 = next(
+        i['bbox'] for i in page.get_image_info(xrefs=True)
         if i['bbox'][0] < 350 and i['bbox'][1] > 560
         and i['bbox'][2] - i['bbox'][0] > 150
     )
-    src = Image.open(io.BytesIO(doc.extract_image(xref)['image'])).convert('RGBA')
-    k = min(480 / src.width, 310 / src.height)
-    small = src.resize((round(src.width * k), round(src.height * k)), Image.LANCZOS)
-    out = Image.new('RGBA', (480, 310), (0, 0, 0, 0))
-    out.paste(small, ((480 - small.width) // 2, (310 - small.height) // 2), small)
+    k = 300 / 72
+    pix = page.get_pixmap(dpi=300)
+    full = Image.frombytes('RGB', (pix.width, pix.height), pix.samples)
+    crop = full.crop((round(x0 * k) + 2, round(y0 * k) + 2,
+                      round(x1 * k) - 2, round(y1 * k) - 2))
+
+    s = min(480 / crop.width, 310 / crop.height)
+    small = crop.resize((round(crop.width * s), round(crop.height * s)), Image.LANCZOS)
+    out = Image.new('RGB', (480, 310), (255, 255, 255))
+    out.paste(small, ((480 - small.width) // 2, (310 - small.height) // 2))
     out.save(f'assets/meeting-1/thumbs/opt-{opt}.png', optimize=True)
 ```
 
