@@ -4,13 +4,13 @@
 export const CONFIG = {
 
   // ── Feedback form ──────────────────────────────────────────────────────
-  // TODO — Win: paste the Formspree endpoint here, e.g.
-  //   'https://formspree.io/f/xxxxxxxx'
-  // While this is empty the form still works: it validates, autosaves, and
-  // offers Download .json / Copy as text / mailto. It just cannot POST.
-  FORM_ENDPOINT: '',
+  // Formspree. Public by design — it only accepts posts, it cannot read the
+  // destination inbox. Change the destination in the Formspree dashboard, not
+  // here. If this is ever blanked the form still validates, autosaves, and
+  // offers Download .json / Copy as text / mailto; it just cannot POST.
+  FORM_ENDPOINT: 'https://formspree.io/f/mkjwoqra',
 
-  // TODO — Win: confirm the destination address for the mailto: fallback.
+  // Used by the mailto: fallback when the network is unavailable.
   FALLBACK_EMAIL: 'pirawit.win@gmail.com',
 
   FORM_SUBJECT: 'Arche Aquatics — Feedback Meeting 1',

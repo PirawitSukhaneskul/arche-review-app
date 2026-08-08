@@ -391,12 +391,19 @@ async function onSubmit(e) {
     const res = await fetch(CONFIG.FORM_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify(payload()),
+      // Pass the honeypot through so Formspree's own filter sees it too,
+      // rather than trusting the client-side check alone. It stays out of
+      // payload() so the Download .json copy is not littered with it.
+      body: JSON.stringify({ ...payload(), _gotcha: host.querySelector('#fb-hp').value }),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     status('ส่งเรียบร้อยแล้ว ขอบคุณครับ · Sent, thank you', 'ok');
     receipt();
+    // Kill any autosave still sitting on its debounce, or it lands after this
+    // and puts the draft straight back — the client reloads and thinks the
+    // send never happened.
+    clearTimeout(saveTimer);
     try { localStorage.removeItem(CONFIG.LS_FEEDBACK); } catch { /* no-op */ }
   } catch (err) {
     // Nothing is cleared on failure — every field stays exactly as typed.
