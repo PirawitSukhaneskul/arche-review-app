@@ -83,11 +83,11 @@ function template() {
             </label>
             <label class="field">
               <span class="field__label">ชอบอะไร <small>Like</small></span>
-              <textarea rows="2" data-role="top-like" data-i="${i}"></textarea>
+              <textarea rows="3" data-role="top-like" data-i="${i}"></textarea>
             </label>
             <label class="field">
               <span class="field__label">ไม่ชอบอะไร <small>Dislike</small></span>
-              <textarea rows="2" data-role="top-dislike" data-i="${i}"></textarea>
+              <textarea rows="3" data-role="top-dislike" data-i="${i}"></textarea>
             </label>
           </div>
         </div>`).join('')}
@@ -107,7 +107,7 @@ function template() {
             </label>
             <label class="field">
               <span class="field__label">เหตุผลที่ตัดออก <small>Reason</small></span>
-              <textarea rows="2" data-role="drop-reason" data-i="${i}"></textarea>
+              <textarea rows="3" data-role="drop-reason" data-i="${i}"></textarea>
             </label>
           </div>
         </div>`).join('')}
@@ -124,14 +124,21 @@ function template() {
     </div>
 
     <div class="fb__actions">
-      <button type="submit" class="btn btn--primary" id="fb-submit">ส่งความเห็น · Send</button>
-      <button type="button" class="btn" data-act="copy">Copy as text</button>
-      <button type="button" class="btn" data-act="json">Download .json</button>
-      <a class="btn" id="fb-mailto" href="#">ส่งทางอีเมล · Email</a>
-      <button type="button" class="btn btn--quiet" data-act="clear">ล้างฟอร์ม · Clear</button>
+      <button type="button" class="btn" data-act="pdf">ดาวน์โหลด PDF · Download PDF</button>
+      <button type="submit" class="btn btn--primary" id="fb-submit">ส่งเมล์ · Send</button>
     </div>
 
     <p class="fb__status" id="fb-status" role="status" aria-live="polite"></p>
+
+    <!-- Only surfaces if a send fails, so nothing typed is ever stranded. -->
+    <div class="fb__fallback" id="fb-fallback" hidden>
+      <p>ส่งไม่สำเร็จ แต่ข้อมูลยังอยู่ครบ · The send failed, nothing was lost.</p>
+      <div class="fb__actions">
+        <a class="btn" id="fb-mailto" href="#">เปิดอีเมล · Open email</a>
+        <button type="button" class="btn" data-act="copy">คัดลอกข้อความ · Copy as text</button>
+      </div>
+    </div>
+
     <div class="fb__receipt" id="fb-receipt" hidden></div>
   </form>`;
 }
@@ -148,8 +155,7 @@ function bind() {
   form.addEventListener('click', (e) => {
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (act === 'copy') copyText();
-    if (act === 'json') downloadJson();
-    if (act === 'clear') clearForm();
+    if (act === 'pdf') downloadPdf();
   });
 }
 
@@ -342,14 +348,86 @@ async function copyText() {
   }
 }
 
-function downloadJson() {
-  const blob = new Blob([JSON.stringify(payload(), null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `arche-feedback-${state.date || 'draft'}.json`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  status('ดาวน์โหลดไฟล์แล้ว · Saved .json', 'ok');
+/**
+ * Builds a clean A4 sheet and hands it to the browser's print dialog, where
+ * "Save as PDF" produces the file.
+ *
+ * A JS PDF library was the obvious alternative, but every one of them needs a
+ * font embedded to draw Thai, and the client types arbitrary Thai so no subset
+ * can be prepared ahead of time — it would mean shipping a whole Thai face for
+ * one button. The browser already has the font loaded and shapes Thai
+ * correctly, so printing gets perfect text for no payload at all.
+ */
+function downloadPdf() {
+  const row = (label, value) => `
+    <tr><th>${esc(label)}</th><td>${esc(value || '—')}</td></tr>`;
+
+  let sheet = document.getElementById('print-sheet');
+  if (!sheet) {
+    sheet = document.createElement('div');
+    sheet.id = 'print-sheet';
+    document.body.append(sheet);
+  }
+
+  sheet.innerHTML = `
+    <header class="ps__head">
+      <div>
+        <h1>ความเห็นลูกค้า <small>Client feedback</small></h1>
+        <p class="ps__meta">Arche Aquatics · โรงเรียนว่ายน้ำ · Meeting 1 — 6 Layouts</p>
+      </div>
+      <span class="mono ps__code">FB-01</span>
+    </header>
+
+    <table class="ps__id">
+      ${row('ผู้ให้ความเห็น / Name', state.name)}
+      ${row('วันที่ / Date', state.date)}
+    </table>
+
+    <h2><span class="mono">A</span> 3 แบบที่ชอบที่สุด <small>Top 3 preferred</small></h2>
+    <table class="ps__grid">
+      <thead>
+        <tr><th class="ps__rank">#</th><th class="ps__opt">ตัวเลือก / Option</th>
+            <th>ชอบอะไร / Like</th><th>ไม่ชอบอะไร / Dislike</th></tr>
+      </thead>
+      <tbody>
+        ${state.top.map((b, i) => `
+          <tr>
+            <td class="mono ps__rank">${i + 1}</td>
+            <td class="mono">${esc(labelFor(b.option))}</td>
+            <td>${esc(b.like || '—')}</td>
+            <td>${esc(b.dislike || '—')}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+
+    <h2><span class="mono">B</span> 3 แบบที่ตัดออก <small>3 dropped</small></h2>
+    <table class="ps__grid">
+      <thead>
+        <tr><th class="ps__rank">#</th><th class="ps__opt">ตัวเลือก / Option</th>
+            <th colspan="2">เหตุผลที่ตัดออก / Reason</th></tr>
+      </thead>
+      <tbody>
+        ${state.dropped.map((b, i) => `
+          <tr>
+            <td class="mono ps__rank">${i + 1}</td>
+            <td class="mono">${esc(labelFor(b.option))}</td>
+            <td colspan="2">${esc(b.reason || '—')}</td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+
+    <h2><span class="mono">C</span> ความเห็นเพิ่มเติม <small>Other comments</small></h2>
+    <p class="ps__comments">${esc(state.comments || '—')}</p>
+
+    <footer class="ps__foot mono">
+      WIN ARCHITECT · พีรวิชญ์ สุขเณศกุล · ${esc(state.date || '')}
+    </footer>`;
+
+  // Set the hint first, because print() blocks until the dialog closes. Called
+  // straight out rather than from requestAnimationFrame — rAF does not fire in
+  // a backgrounded tab, and the print engine lays the sheet out itself anyway.
+  status('เลือก “Save as PDF” ในหน้าต่างพิมพ์ · Choose “Save as PDF” in the print dialog', 'ok');
+  window.print();
 }
 
 /* ── submit ──────────────────────────────────────────────────────────────── */
@@ -378,8 +456,8 @@ async function onSubmit(e) {
   const btn = host.querySelector('#fb-submit');
 
   if (!CONFIG.FORM_ENDPOINT) {
-    status('ยังไม่ได้ตั้งค่าปลายทางของฟอร์ม — ใช้ Copy / Download / Email แทน · '
-      + 'No form endpoint configured yet; use Copy, Download, or Email.', 'err');
+    status('ยังไม่ได้ตั้งค่าปลายทางของฟอร์ม · No form endpoint configured yet.', 'err');
+    showFallback();
     receipt();
     return;
   }
@@ -399,6 +477,7 @@ async function onSubmit(e) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     status('ส่งเรียบร้อยแล้ว ขอบคุณครับ · Sent, thank you', 'ok');
+    host.querySelector('#fb-fallback').hidden = true;
     receipt();
     // Kill any autosave still sitting on its debounce, or it lands after this
     // and puts the draft straight back — the client reloads and thinks the
@@ -407,12 +486,17 @@ async function onSubmit(e) {
     try { localStorage.removeItem(CONFIG.LS_FEEDBACK); } catch { /* no-op */ }
   } catch (err) {
     // Nothing is cleared on failure — every field stays exactly as typed.
-    status(`ส่งไม่สำเร็จ (${err.message}) — ข้อมูลยังอยู่ครบ ใช้ Copy / Download / Email ได้ · `
-      + 'Send failed; your answers are intact, use the fallbacks below.', 'err');
+    status(`ส่งไม่สำเร็จ (${err.message}) · Send failed.`, 'err');
+    showFallback();
     receipt();
   } finally {
     btn.disabled = false;
   }
+}
+
+function showFallback() {
+  updateMailto();
+  host.querySelector('#fb-fallback').hidden = false;
 }
 
 function receipt() {
@@ -427,17 +511,6 @@ function status(msg, kind) {
   const el = host.querySelector('#fb-status');
   el.textContent = msg;
   el.dataset.kind = kind;
-}
-
-function clearForm() {
-  if (!confirm('ล้างข้อมูลทั้งหมด? / Clear the whole form?')) return;
-  state = blank();
-  try { localStorage.removeItem(CONFIG.LS_FEEDBACK); } catch { /* no-op */ }
-  host.querySelector('#fb-receipt').hidden = true;
-  hydrate();
-  refreshOptionLists();
-  showSavedStamp(null);
-  status('', '');
 }
 
 function q(sel) {

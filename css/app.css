@@ -552,7 +552,21 @@ textarea { resize: vertical; min-height: 44px; }
 .fb__block { display: flex; gap: 12px; }
 .fb__block + .fb__block { border-top: 1px solid rgba(198,192,183,0.5); padding-top: 14px; margin-top: 4px; }
 .fb__rank { color: var(--ink-40); font-size: 16px; padding-top: 20px; flex: none; width: 18px; }
-.fb__blockbody { flex: 1; display: flex; flex-wrap: wrap; gap: 0 16px; min-width: 0; }
+
+/* Option, then Like and Dislike on equal columns so the pair reads as one
+   balanced question rather than one wide box and one wrapped underneath. */
+.fb__blockbody {
+  flex: 1; min-width: 0;
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 16px;
+  align-items: start;
+}
+.fb__blockbody .field { flex: none; }
+.fb__blockbody textarea { min-height: 78px; }
+/* the dropped blocks have one text field, so it spans both text columns and
+   still lines up with Like + Dislike above */
+.fb__block[data-drop] .fb__blockbody .field:last-child { grid-column: 2 / -1; }
 
 .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
 
@@ -569,6 +583,13 @@ textarea { resize: vertical; min-height: 44px; }
 .btn--primary:hover { background: #6d8a55; border-color: #6d8a55; }
 .btn--primary:disabled { opacity: 0.55; cursor: progress; }
 .btn--quiet { margin-left: auto; color: var(--ink-60); }
+
+.fb__fallback {
+  margin-top: 14px; padding: 12px 14px;
+  border: 1px solid var(--public); border-radius: 2px;
+  background: rgba(217, 142, 79, 0.07);
+}
+.fb__fallback p { margin: 0 0 10px; font-size: 12.5px; }
 
 .fb__status { margin: 14px 0 0; font-size: 13px; min-height: 1.4em; }
 .fb__status[data-kind='ok']   { color: var(--athlete); }
@@ -650,6 +671,77 @@ textarea { resize: vertical; min-height: 44px; }
 
 @media (min-width: 760px) {
   .rail-scrim { display: none; }
+}
+
+/* ── print / Save as PDF ─────────────────────────────────────────────────── */
+
+#print-sheet { display: none; }
+
+@media print {
+  @page { size: A4 portrait; margin: 15mm; }
+
+  html, body { height: auto; background: #fff; }
+  body > *:not(#print-sheet) { display: none !important; }
+
+  #print-sheet {
+    display: block;
+    font-family: var(--font-body);
+    font-size: 10.5pt;
+    line-height: 1.45;
+    color: #000;
+  }
+
+  .ps__head {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding-bottom: 8px; margin-bottom: 14px;
+    border-bottom: 1.5pt solid #000;
+  }
+  .ps__head h1 { font-size: 16pt; }
+  .ps__head h1 small { font-weight: 400; font-size: 10pt; color: #444; }
+  .ps__meta { margin: 3px 0 0; font-size: 9pt; color: #444; }
+  .ps__code { font-size: 11pt; color: #444; }
+
+  #print-sheet h2 {
+    font-size: 11pt; margin: 16px 0 6px;
+    padding-bottom: 3px; border-bottom: 0.5pt solid #999;
+  }
+  #print-sheet h2 small { font-weight: 400; font-size: 9pt; color: #444; }
+  #print-sheet h2 .mono { margin-right: 6px; color: #444; }
+
+  #print-sheet table { width: 100%; border-collapse: collapse; }
+  .ps__id { margin-bottom: 4px; }
+  .ps__id th, .ps__id td {
+    text-align: left; padding: 4px 8px 4px 0; font-size: 10pt;
+    vertical-align: top;
+  }
+  .ps__id th { width: 46mm; font-weight: 500; color: #444; }
+
+  .ps__grid th, .ps__grid td {
+    border: 0.5pt solid #999; padding: 5px 7px;
+    text-align: left; vertical-align: top;
+    word-break: break-word;
+  }
+  .ps__grid thead th {
+    font-size: 8.5pt; font-weight: 600; background: #F0EDE5;
+  }
+  .ps__rank { width: 8mm; text-align: center; }
+  .ps__opt { width: 34mm; }
+
+  /* keep a row and its heading together across a page break */
+  #print-sheet h2, .ps__grid thead { break-after: avoid; }
+  .ps__grid tr { break-inside: avoid; }
+
+  .ps__comments {
+    margin: 0; padding: 7px;
+    border: 0.5pt solid #999; min-height: 22mm;
+    white-space: pre-wrap;
+  }
+
+  .ps__foot {
+    margin-top: 18px; padding-top: 6px;
+    border-top: 0.5pt solid #999;
+    font-size: 8pt; color: #555;
+  }
 }
 
 /* ── reduced motion ──────────────────────────────────────────────────────── */
