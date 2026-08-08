@@ -55,9 +55,12 @@ export const CONFIG = {
   EDGE_COLOR: 0x2C2A27,
   EDGE_OPACITY: 1.0,       // was 0.35 — the drawn linework reads far stronger
 
-  // Lawn: keep the texture for grain, lifted to a light olive.
+  // Lawn: keep the texture for grain, muted and lightened so the olive tint
+  // decides the colour. A tint alone only multiplies and cannot desaturate,
+  // which is what left the lawn a vivid lime.
   GRASS_COLOR: 0xC3CE9B,
-  GRASS_EMISSIVE: 0.16,    // stops the tint from dragging the texture dark
+  GRASS_TEX_SATURATE: 0.4,
+  GRASS_TEX_BRIGHTNESS: 1.3,
   GRASS_ROUGHNESS: 0.95,
 
   /**

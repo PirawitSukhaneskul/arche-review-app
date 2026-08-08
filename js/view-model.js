@@ -447,22 +447,24 @@ function outlineOf(geometry) {
 function toStandard(src) {
   if (!src || src.isMeshStandardMaterial) return src;
 
-  // The lawn reads too dark against the pale sheets. Keep its texture so the
-  // grain still looks like grass, tint it to a light olive, and add a little
-  // emissive so the tint lifts the texture instead of dragging it down.
+  // The lawn keeps its texture so it still reads as grass rather than a flat
+  // card, but the SketchUp image is a strong mid-green. A colour tint only
+  // multiplies, which can never desaturate, so the texture itself is muted and
+  // lightened before the olive tint goes on top.
   if (/grass|lawn/i.test(src.name || '')) {
-    const olive = new THREE.Color(CONFIG.GRASS_COLOR);
     const g = new THREE.MeshStandardMaterial({
-      color: olive,
+      color: new THREE.Color(CONFIG.GRASS_COLOR),
       map: src.map || null,
-      emissive: olive.clone().multiplyScalar(CONFIG.GRASS_EMISSIVE),
       roughness: CONFIG.GRASS_ROUGHNESS,
       metalness: 0.0,
       side: src.side === THREE.DoubleSide ? THREE.DoubleSide : THREE.FrontSide,
     });
     g.envMapIntensity = 0.7;
     g.name = src.name;
-    if (g.map) g.map.colorSpace = THREE.SRGBColorSpace;
+    if (g.map) {
+      g.map.colorSpace = THREE.SRGBColorSpace;
+      muteTexture(g, src.map);
+    }
     src.dispose?.();
     return g;
   }
@@ -483,6 +485,52 @@ function toStandard(src) {
   else snapToLegend(m.color);
   src.dispose?.();
   return m;
+}
+
+/**
+ * Repaints a texture through a canvas with reduced saturation and raised
+ * brightness, keeping the grain but dropping the colour so the material's own
+ * tint decides the hue. Textures load asynchronously, so this waits for the
+ * image when it is not decoded yet.
+ */
+function muteTexture(material, tex) {
+  const run = () => {
+    const img = tex.image;
+    if (!img?.width) return;
+    try {
+      const c = document.createElement('canvas');
+      c.width = img.width;
+      c.height = img.height;
+      const ctx = c.getContext('2d');
+      ctx.filter = `saturate(${CONFIG.GRASS_TEX_SATURATE}) `
+                 + `brightness(${CONFIG.GRASS_TEX_BRIGHTNESS})`;
+      ctx.drawImage(img, 0, 0);
+
+      const out = new THREE.CanvasTexture(c);
+      out.colorSpace = THREE.SRGBColorSpace;
+      out.wrapS = tex.wrapS;
+      out.wrapT = tex.wrapT;
+      out.repeat.copy(tex.repeat);
+      out.offset.copy(tex.offset);
+      out.anisotropy = renderer?.capabilities.getMaxAnisotropy?.() ?? 1;
+      out.needsUpdate = true;
+
+      material.map = out;
+      material.needsUpdate = true;
+      requestRender();
+    } catch {
+      /* leave the original texture in place */
+    }
+  };
+
+  // TextureLoader leaves `image` undefined until the fetch resolves, so there
+  // is nothing to attach a load listener to yet. Poll for it instead.
+  let tries = 60;
+  const wait = () => {
+    if (tex.image?.width) { run(); return; }
+    if (--tries > 0) setTimeout(wait, 100);
+  };
+  wait();
 }
 
 const LEGEND_HUES = Object.values(CONFIG.LEGEND).map((hex) => {
