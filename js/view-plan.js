@@ -2,8 +2,22 @@ import { CONFIG } from './config.js';
 import { esc } from './ui-rail.js';
 import * as pdfjs from 'pdfjs-dist';
 
-pdfjs.GlobalWorkerOptions.workerSrc =
-  'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/build/pdf.worker.min.mjs';
+const PDFJS_CDN = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108';
+
+pdfjs.GlobalWorkerOptions.workerSrc = `${PDFJS_CDN}/build/pdf.worker.min.mjs`;
+
+/**
+ * pdf.js v6 decodes JBIG2 / JPEG2000 images and applies ICC colour through
+ * WebAssembly modules it fetches at runtime. Without `wasmUrl` those decoders
+ * fail with "JBig2 failed to initialize" and the affected images are silently
+ * dropped — which is what blanked the colour fills on sheet M1-01.
+ */
+const PDF_RESOURCES = {
+  wasmUrl: `${PDFJS_CDN}/wasm/`,
+  cMapUrl: `${PDFJS_CDN}/cmaps/`,
+  cMapPacked: true,
+  standardFontDataUrl: `${PDFJS_CDN}/standard_fonts/`,
+};
 
 /**
  * Plan pane. Renders the A3 sheet with PDF.js into a canvas — an <iframe>
@@ -77,7 +91,11 @@ export async function showPlan(item) {
   skeleton(item);
 
   try {
-    loadingTask = pdfjs.getDocument({ url: item.plan, isEvalSupported: false });
+    loadingTask = pdfjs.getDocument({
+      url: item.plan,
+      isEvalSupported: false,
+      ...PDF_RESOURCES,
+    });
     doc = await loadingTask.promise;
     if (mine !== token) return;
 
