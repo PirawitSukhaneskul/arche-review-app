@@ -40,8 +40,8 @@ export const CONFIG = {
   // Starting point for the display sliders. The client can push these around
   // live and the choice is remembered per browser.
   EXPOSURE: 1.05,
-  CONTRAST: 1.12,
-  SATURATION: 1.35,        // flat SketchUp faces, not a washed-out film look
+  CONTRAST: 1.00,
+  SATURATION: 0.90,        // dialled in on the real models; keeps the lawn calm
   SHADOW_OPACITY: 0.30,
 
   // ── Fly navigation ─────────────────────────────────────────────────────
