@@ -1,0 +1,105 @@
+{
+  "project": {
+    "name": "Arche Aquatics",
+    "nameTh": "โรงเรียนว่ายน้ำ",
+    "location": "ต.หนองญาติ จ.นครพนม",
+    "office": "WIN ARCHITECT",
+    "architect": "พีรวิชญ์ สุขเณศกุล"
+  },
+  "meetings": [
+    {
+      "id": "m1",
+      "no": 1,
+      "title": "6 Layouts",
+      "titleTh": "เทียบผังทางเลือก 6 แบบ",
+      "date": "2026-08-07",
+      "status": "ready",
+      "items": [
+        {
+          "id": "opt-1",
+          "label": "Option 1",
+          "sheet": "M1-01",
+          "plan": "assets/meeting-1/plans/opt-1.pdf",
+          "model": "assets/meeting-1/models/opt-1.dae",
+          "thumb": "assets/meeting-1/thumbs/opt-1.png",
+          "modelUp": "Z",
+          "modelScale": 1
+        },
+        {
+          "id": "opt-2",
+          "label": "Option 2",
+          "sheet": "M1-02",
+          "plan": "assets/meeting-1/plans/opt-2.pdf",
+          "model": "assets/meeting-1/models/opt-2.dae",
+          "thumb": "assets/meeting-1/thumbs/opt-2.png",
+          "modelUp": "Z",
+          "modelScale": 1
+        },
+        {
+          "id": "opt-3",
+          "label": "Option 3",
+          "sheet": "M1-03",
+          "plan": "assets/meeting-1/plans/opt-3.pdf",
+          "model": "assets/meeting-1/models/opt-3.dae",
+          "thumb": "assets/meeting-1/thumbs/opt-3.png",
+          "modelUp": "Z",
+          "modelScale": 1
+        },
+        {
+          "id": "opt-4",
+          "label": "Option 4",
+          "sheet": "M1-04",
+          "plan": "assets/meeting-1/plans/opt-4.pdf",
+          "model": "assets/meeting-1/models/opt-4.dae",
+          "thumb": "assets/meeting-1/thumbs/opt-4.png",
+          "modelUp": "Z",
+          "modelScale": 1
+        },
+        {
+          "id": "opt-5",
+          "label": "Option 5",
+          "sheet": "M1-05",
+          "plan": "assets/meeting-1/plans/opt-5.pdf",
+          "model": "assets/meeting-1/models/opt-5.dae",
+          "thumb": "assets/meeting-1/thumbs/opt-5.png",
+          "modelUp": "Z",
+          "modelScale": 1
+        },
+        {
+          "id": "opt-6",
+          "label": "Option 6",
+          "sheet": "M1-06",
+          "plan": "assets/meeting-1/plans/opt-6.pdf",
+          "model": "assets/meeting-1/models/opt-6.dae",
+          "thumb": "assets/meeting-1/thumbs/opt-6.png",
+          "modelUp": "Z",
+          "modelScale": 1
+        }
+      ]
+    },
+    {
+      "id": "m2",
+      "no": 2,
+      "title": "3D — 3 options",
+      "titleTh": "พัฒนาแบบ 3 มิติ 3 ทางเลือก",
+      "status": "pending",
+      "items": []
+    },
+    {
+      "id": "m3",
+      "no": 3,
+      "title": "Design development",
+      "titleTh": "พัฒนาแบบ",
+      "status": "pending",
+      "items": []
+    },
+    {
+      "id": "m4",
+      "no": 4,
+      "title": "Cost estimation",
+      "titleTh": "ประมาณราคา",
+      "status": "pending",
+      "items": []
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Arche Aquatics — Design Review</title>
+<meta name="description" content="โรงเรียนว่ายน้ำ Arche Aquatics — review each design meeting and send feedback.">
+<meta name="robots" content="noindex, nofollow">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css">
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/",
+    "pdfjs-dist": "https://cdn.jsdelivr.net/npm/pdfjs-dist@6.2.108/build/pdf.min.mjs"
+  }
+}
+</script>
+</head>
+<body>
+
+<a class="skip-link" href="#stage">ข้ามไปยังเนื้อหา / Skip to content</a>
+
+<div class="app" id="app" data-mode="split">
+
+  <!-- ── RAIL ─────────────────────────────────────────────────────────── -->
+  <aside class="rail" id="rail" aria-label="Meetings">
+    <div class="rail__brand">
+      <div class="rail__project">Arche Aquatics</div>
+      <div class="rail__sub">โรงเรียนว่ายน้ำ · ต.หนองญาติ จ.นครพนม</div>
+    </div>
+    <nav class="rail__nav" id="rail-nav" aria-label="Meetings and options"></nav>
+    <div class="rail__foot">
+      <a class="rail__feedback" id="rail-feedback" href="#/feedback">
+        <span class="mono">FB</span>
+        <span>ความเห็นลูกค้า<small>Client feedback</small></span>
+      </a>
+      <div class="rail__office mono">WIN ARCHITECT</div>
+    </div>
+  </aside>
+  <div class="rail-scrim" id="rail-scrim" hidden></div>
+
+  <!-- ── MAIN ─────────────────────────────────────────────────────────── -->
+  <div class="main">
+
+    <header class="header" id="header">
+      <button class="hamburger" id="rail-toggle" aria-label="เปิดเมนู / Toggle navigation"
+              aria-controls="rail" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+
+      <div class="header__id">
+        <span class="mono header__sheet" id="header-sheet"></span>
+        <h1 class="header__title" id="header-title">Arche Aquatics</h1>
+      </div>
+
+      <div class="switcher" id="switcher" role="group" aria-label="โหมดมุมมอง / View mode" hidden>
+        <button type="button" data-mode="plan"  aria-pressed="false">Plan</button>
+        <button type="button" data-mode="model" aria-pressed="false">Model</button>
+        <button type="button" data-mode="split" aria-pressed="false">Split</button>
+      </div>
+
+      <div class="header__links" id="header-links" hidden>
+        <a id="link-raw" href="#" target="_blank" rel="noopener">เปิด PDF<span class="sr-only"> ในแท็บใหม่</span> ↗</a>
+        <a id="link-dl" href="#" download>Download</a>
+      </div>
+    </header>
+
+    <section class="stage" id="stage" tabindex="-1">
+
+      <!-- option grid -->
+      <div class="view" id="view-grid" hidden></div>
+
+      <!-- pending / error message -->
+      <div class="view view--center" id="view-empty" hidden></div>
+
+      <!-- feedback form -->
+      <div class="view view--scroll" id="view-feedback" hidden></div>
+
+      <!-- workspace: built once, never torn down, so the WebGL context survives -->
+      <div class="view workspace" id="view-workspace" hidden>
+        <div class="pane pane--plan" id="pane-plan"></div>
+        <div class="divider" id="divider" role="separator" tabindex="0"
+             aria-label="ปรับสัดส่วน / Resize panes" aria-orientation="vertical"
+             aria-valuemin="15" aria-valuemax="85" aria-valuenow="50">
+          <span class="divider__grip" aria-hidden="true"></span>
+        </div>
+        <div class="pane pane--model" id="pane-model"></div>
+      </div>
+
+    </section>
+  </div>
+</div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
