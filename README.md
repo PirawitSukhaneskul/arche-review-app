@@ -57,6 +57,36 @@ assets/meeting-<N>/
 Thumbnails are optional. Any option without one falls back to a generated
 hatched placeholder showing the sheet number, so the grid never breaks.
 
+### Where the thumbnails came from
+
+Each option sheet in the deck embeds its **3D MASSING** view as a standalone
+~500×330 PNG in the bottom-left corner, already on a transparent background.
+Those are extracted directly — no screenshotting, no re-rendering — and fitted
+into the 480×310 frame with transparent padding so nothing is distorted or
+cropped.
+
+```python
+import io, pymupdf
+from PIL import Image
+
+doc = pymupdf.open('Arche_Aquatics_Meeting1_6Layouts.pdf')
+for opt, page_no in {1: 4, 2: 5, 3: 6, 4: 7, 5: 8, 6: 9}.items():
+    # the one big raster placed in the bottom-left block
+    xref = next(
+        i['xref'] for i in doc[page_no - 1].get_image_info(xrefs=True)
+        if i['bbox'][0] < 350 and i['bbox'][1] > 560
+        and i['bbox'][2] - i['bbox'][0] > 150
+    )
+    src = Image.open(io.BytesIO(doc.extract_image(xref)['image'])).convert('RGBA')
+    k = min(480 / src.width, 310 / src.height)
+    small = src.resize((round(src.width * k), round(src.height * k)), Image.LANCZOS)
+    out = Image.new('RGBA', (480, 310), (0, 0, 0, 0))
+    out.paste(small, ((480 - small.width) // 2, (310 - small.height) // 2), small)
+    out.save(f'assets/meeting-1/thumbs/opt-{opt}.png', optimize=True)
+```
+
+Needs `pip install pymupdf pillow`.
+
 ### Where the Meeting 1 plan sheets came from
 
 `opt-1.pdf` … `opt-6.pdf` are pages **4–9** of the client presentation
