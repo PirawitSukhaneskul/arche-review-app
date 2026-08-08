@@ -377,6 +377,44 @@ body.is-dragging-v { cursor: row-resize; }
 .model__bar button[aria-pressed='true'] { border-color: var(--rule); background: var(--panel); }
 .model__bar button.is-off { opacity: 0.45; text-decoration: line-through; }
 
+/* display grading panel */
+.model__display {
+  position: absolute; left: 12px; bottom: 58px;
+  display: grid; gap: 10px;
+  width: 216px; padding: 12px;
+  border: 1px solid var(--rule); border-radius: 2px;
+  background: rgba(252, 250, 246, 0.96);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 10px rgba(44, 42, 39, 0.10);
+}
+.model__display label { display: grid; gap: 4px; font-size: 11.5px; }
+.model__display span { display: flex; justify-content: space-between; }
+.model__display output {
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-60);
+}
+.model__display input[type='range'] { width: 100%; accent-color: var(--athlete); }
+.model__display button {
+  justify-self: start; padding: 3px 10px; font-size: 11.5px;
+  background: var(--paper); border: 1px solid var(--rule); border-radius: 2px;
+  cursor: pointer;
+}
+.model__display button:hover { background: var(--panel); }
+
+/* keyboard-navigation hint */
+.model__keys {
+  position: absolute; right: 12px; bottom: 12px;
+  padding: 5px 9px; font-size: 10.5px; color: var(--ink-40);
+  border: 1px solid transparent; border-radius: 2px;
+  background: rgba(252, 250, 246, 0.72);
+  transition: color var(--t) ease-out, border-color var(--t) ease-out;
+  pointer-events: none;
+}
+.model__keys .mono { font-size: 9.5px; }
+.model__keys.is-live { color: var(--athlete); border-color: var(--athlete); }
+
+/* the pane itself takes focus for WASD, so show that it is armed */
+.pane--model:focus-visible { outline: 2px solid var(--water); outline-offset: -2px; }
+
 /* ── skeleton and pane messages ──────────────────────────────────────────── */
 
 .skeleton {

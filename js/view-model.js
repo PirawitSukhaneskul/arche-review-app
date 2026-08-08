@@ -3,6 +3,7 @@ import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONFIG } from './config.js';
 import { esc } from './ui-rail.js';
 
@@ -111,19 +112,47 @@ function init() {
       <span class="model__sep" aria-hidden="true"></span>
       <button type="button" data-act="proj" aria-pressed="true">Ortho</button>
       <button type="button" data-act="edges" aria-pressed="true">Edges</button>
+      <button type="button" data-act="display" aria-expanded="false"
+              aria-controls="model-display" title="ภาพ / Contrast + saturation">◐</button>
       <button type="button" data-act="full" aria-label="เต็มจอ / Fullscreen">⤢</button>
+    </div>
+
+    <div class="model__display" id="model-display" hidden>
+      <label>
+        <span>Contrast <output id="out-contrast"></output></span>
+        <input type="range" id="in-contrast" min="0.6" max="2" step="0.01">
+      </label>
+      <label>
+        <span>Saturation <output id="out-saturate"></output></span>
+        <input type="range" id="in-saturate" min="0" max="2.5" step="0.01">
+      </label>
+      <label>
+        <span>Shadow <output id="out-shadow"></output></span>
+        <input type="range" id="in-shadow" min="0" max="0.7" step="0.01">
+      </label>
+      <button type="button" data-act="display-reset">Reset</button>
+    </div>
+
+    <div class="model__keys" id="model-keys" aria-hidden="true">
+      <span class="mono">WASD</span> เดิน ·
+      <span class="mono">QE</span> ขึ้นลง ·
+      <span class="mono">SHIFT</span> เร็วขึ้น
     </div>`;
 
   els = {
     stage: host.querySelector('#model-stage'),
     overlay: host.querySelector('#model-overlay'),
     bar: host.querySelector('.model__bar'),
+    display: host.querySelector('#model-display'),
+    keys: host.querySelector('#model-keys'),
   };
 
   renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.0;
+  // ACES filmic desaturates hard — it is a cinema look, and it turned the
+  // programme colours milky. Neutral keeps the flat, saturated SketchUp faces.
+  renderer.toneMapping = THREE.NeutralToneMapping;
+  renderer.toneMappingExposure = CONFIG.EXPOSURE;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
@@ -154,7 +183,7 @@ function init() {
 
   ground = new THREE.Mesh(
     new THREE.PlaneGeometry(CONFIG.GROUND_SIZE, CONFIG.GROUND_SIZE),
-    new THREE.ShadowMaterial({ opacity: 0.20 })
+    new THREE.ShadowMaterial({ opacity: CONFIG.SHADOW_OPACITY })
   );
   ground.rotation.x = -Math.PI / 2;
   // The model is normalised to sit exactly on y=0, so a ground plane at y=0
@@ -177,13 +206,40 @@ function init() {
   controls.addEventListener('change', requestRender);
 
   els.bar.addEventListener('click', onBar);
+  els.display.addEventListener('input', onGrade);
+  els.display.addEventListener('click', (e) => {
+    if (e.target.dataset.act === 'display-reset') {
+      grade = {
+        contrast: CONFIG.CONTRAST,
+        saturate: CONFIG.SATURATION,
+        shadow: CONFIG.SHADOW_OPACITY,
+      };
+      applyGrade();
+    }
+  });
   syncToggles();
+  applyGrade();
 
   new ResizeObserver(resizeModel).observe(host);
+
+  // The pane has to be focusable for WASD to reach it, and clicking into the
+  // model is the natural way to say "I am driving this now".
+  host.tabIndex = 0;
   host.addEventListener('keydown', onKey);
-  host.tabIndex = -1;
+  host.addEventListener('keyup', onKeyUp);
+  host.addEventListener('pointerdown', () => host.focus({ preventScroll: true }));
+  host.addEventListener('blur', stopFlying);
 
   resizeModel();
+}
+
+function onGrade(e) {
+  const id = e.target.id;
+  if (id === 'in-contrast') grade.contrast = +e.target.value;
+  else if (id === 'in-saturate') grade.saturate = +e.target.value;
+  else if (id === 'in-shadow') grade.shadow = +e.target.value;
+  else return;
+  applyGrade();
 }
 
 function placeLight(light, azDeg, elDeg, dist) {
@@ -273,8 +329,12 @@ function normalise(inner, item, isGlb) {
       return;
     }
     const line = new THREE.LineSegments(
-      new THREE.EdgesGeometry(o.geometry, CONFIG.EDGE_ANGLE_DEG),
-      new THREE.LineBasicMaterial({ color: 0x2C2A27, transparent: true, opacity: 0.35 })
+      outlineOf(o.geometry),
+      new THREE.LineBasicMaterial({
+        color: CONFIG.EDGE_COLOR,
+        transparent: CONFIG.EDGE_OPACITY < 1,
+        opacity: CONFIG.EDGE_OPACITY,
+      })
     );
     line.visible = edgesOn;
     o.add(line);          // child of the mesh, so it inherits every transform
@@ -286,8 +346,127 @@ function normalise(inner, item, isGlb) {
   return { root: group, edges };
 }
 
+/**
+ * Real silhouette and crease edges only — no triangulation lines.
+ *
+ * ColladaLoader hands back non-indexed geometry, so EdgesGeometry sees every
+ * triangle as an island with no neighbours and dutifully draws all three of its
+ * sides, which is what covers the model in polygon lines. Welding first gives
+ * it the face adjacency it needs for the crease-angle test to mean anything.
+ *
+ * The weld runs on position ONLY. SketchUp writes per-face normals and per-face
+ * UVs, so vertices along a shared edge differ in those attributes and a normal
+ * mergeVertices() would refuse to join them — leaving the lines exactly as they
+ * were.
+ */
+function outlineOf(geometry) {
+  const pos = geometry.getAttribute('position');
+  if (!pos) return new THREE.BufferGeometry();
+
+  let welded = null;
+  try {
+    // Weld on position ONLY. SketchUp writes per-face normals and UVs, so
+    // vertices along a shared edge differ in those and a full mergeVertices()
+    // would refuse to join them.
+    const bare = new THREE.BufferGeometry();
+    bare.setAttribute('position', pos.clone());
+    welded = mergeVertices(bare, CONFIG.WELD_TOLERANCE);
+
+    const idx = welded.getIndex();
+    const wp = welded.getAttribute('position');
+    if (!idx) return new THREE.EdgesGeometry(geometry, CONFIG.EDGE_ANGLE_DEG);
+
+    // Drop degenerate and duplicate triangles. SketchUp exports coincident
+    // faces (front/back pairs, nested groups); they leave every interior edge
+    // looking unpaired, so EdgesGeometry treats it as an open border and draws
+    // it unconditionally — which is what covers the model in polygon lines.
+    // Sorting each triple also collapses reversed-winding duplicates.
+    const seen = new Set();
+    const faces = [];
+    for (let i = 0; i < idx.count; i += 3) {
+      const a = idx.getX(i), b = idx.getX(i + 1), c = idx.getX(i + 2);
+      if (a === b || b === c || a === c) continue;
+      const key = a < b
+        ? (b < c ? `${a},${b},${c}` : a < c ? `${a},${c},${b}` : `${c},${a},${b}`)
+        : (a < c ? `${b},${a},${c}` : b < c ? `${b},${c},${a}` : `${c},${b},${a}`);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      faces.push(a, b, c);
+    }
+
+    const vA = new THREE.Vector3(), vB = new THREE.Vector3(), vC = new THREE.Vector3();
+    const ab = new THREE.Vector3(), cb = new THREE.Vector3();
+    const normals = [];
+    for (let f = 0; f < faces.length; f += 3) {
+      vA.fromBufferAttribute(wp, faces[f]);
+      vB.fromBufferAttribute(wp, faces[f + 1]);
+      vC.fromBufferAttribute(wp, faces[f + 2]);
+      normals.push(new THREE.Vector3()
+        .crossVectors(cb.subVectors(vC, vB), ab.subVectors(vA, vB)).normalize());
+    }
+
+    const edges = new Map();
+    for (let f = 0; f < faces.length; f += 3) {
+      const tri = [faces[f], faces[f + 1], faces[f + 2]];
+      for (let e = 0; e < 3; e++) {
+        const u = tri[e], v = tri[(e + 1) % 3];
+        const key = u < v ? `${u}_${v}` : `${v}_${u}`;
+        const rec = edges.get(key);
+        if (rec) rec.push(f / 3);
+        else edges.set(key, [f / 3]);
+      }
+    }
+
+    const cosLimit = Math.cos(THREE.MathUtils.degToRad(CONFIG.EDGE_ANGLE_DEG));
+    const out = [];
+    const p = new THREE.Vector3(), q = new THREE.Vector3();
+    for (const [key, adj] of edges) {
+      let keep = adj.length === 1;          // a genuine open border / silhouette
+      for (let i = 0; i < adj.length && !keep; i++) {
+        for (let j = i + 1; j < adj.length && !keep; j++) {
+          if (normals[adj[i]].dot(normals[adj[j]]) < cosLimit) keep = true;
+        }
+      }
+      if (!keep) continue;
+      const [u, v] = key.split('_');
+      p.fromBufferAttribute(wp, +u);
+      q.fromBufferAttribute(wp, +v);
+      out.push(p.x, p.y, p.z, q.x, q.y, q.z);
+    }
+
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(out, 3));
+    return g;
+  } catch {
+    return new THREE.EdgesGeometry(geometry, CONFIG.EDGE_ANGLE_DEG);
+  } finally {
+    welded?.dispose();
+  }
+}
+
 function toStandard(src) {
   if (!src || src.isMeshStandardMaterial) return src;
+
+  // The lawn reads too dark against the pale sheets. Keep its texture so the
+  // grain still looks like grass, tint it to a light olive, and add a little
+  // emissive so the tint lifts the texture instead of dragging it down.
+  if (/grass|lawn/i.test(src.name || '')) {
+    const olive = new THREE.Color(CONFIG.GRASS_COLOR);
+    const g = new THREE.MeshStandardMaterial({
+      color: olive,
+      map: src.map || null,
+      emissive: olive.clone().multiplyScalar(CONFIG.GRASS_EMISSIVE),
+      roughness: CONFIG.GRASS_ROUGHNESS,
+      metalness: 0.0,
+      side: src.side === THREE.DoubleSide ? THREE.DoubleSide : THREE.FrontSide,
+    });
+    g.envMapIntensity = 0.7;
+    g.name = src.name;
+    if (g.map) g.map.colorSpace = THREE.SRGBColorSpace;
+    src.dispose?.();
+    return g;
+  }
+
   // Collada gives Phong, which does not react to the environment map.
   const m = new THREE.MeshStandardMaterial({
     color: src.color ? src.color.clone() : new THREE.Color(0xFFFFFF),
@@ -299,9 +478,41 @@ function toStandard(src) {
     metalness: 0.0,
   });
   m.envMapIntensity = 0.85;
+  m.name = src.name || '';
   if (m.map) m.map.colorSpace = THREE.SRGBColorSpace;
+  else snapToLegend(m.color);
   src.dispose?.();
   return m;
+}
+
+const LEGEND_HUES = Object.values(CONFIG.LEGEND).map((hex) => {
+  const c = new THREE.Color(hex);
+  const hsl = { h: 0, s: 0, l: 0 };
+  c.getHSL(hsl);
+  return { color: c, h: hsl.h };
+});
+
+/**
+ * Pulls a flat programme colour onto the nearest plan-legend tone, so a room
+ * that is olive on the sheet is the same olive on the model.
+ *
+ * Only untextured, genuinely saturated faces are touched — concrete, glass,
+ * white roofs and every grey stay exactly as the model author left them.
+ */
+function snapToLegend(color) {
+  const hsl = { h: 0, s: 0, l: 0 };
+  color.getHSL(hsl);
+  if (hsl.s < CONFIG.LEGEND_MIN_SATURATION) return;
+
+  let best = null;
+  let bestDist = Infinity;
+  for (const entry of LEGEND_HUES) {
+    // hue is circular, so 350° and 10° are 20° apart, not 340°
+    const d = Math.abs(hsl.h - entry.h);
+    const dist = Math.min(d, 1 - d);
+    if (dist < bestDist) { bestDist = dist; best = entry; }
+  }
+  if (best) color.copy(best.color);
 }
 
 /* ── attach / cache ──────────────────────────────────────────────────────── */
@@ -366,6 +577,7 @@ function frameTo(presetName) {
   const target = box.getCenter(new THREE.Vector3());
   const dir = dirVector(az, el);
   const radius = Math.max(sphere.radius, 0.001);
+  modelRadius = radius;                      // walk speed scales with the model
 
   // Orthographic framing comes from the frustum extents, so the camera only
   // has to stand far enough back to clear the scene. Perspective framing IS
@@ -502,13 +714,16 @@ function requestRender() {
   requestAnimationFrame(tick);
 }
 
-function tick() {
+function tick(now) {
   renderPending = false;
+  const flew = flying ? step(now ?? performance.now()) : false;
   // update() returns true while damping is still settling — that, and only
   // that, keeps the loop alive. A static model costs zero frames.
   const moving = controls.update();
   renderer.render(scene, camera);
-  if (moving) requestRender();
+
+  if (!held.size && flying) stopFlying();
+  if (moving || flew || flying) requestRender();
 }
 
 /* ── toolbar ─────────────────────────────────────────────────────────────── */
@@ -522,6 +737,12 @@ function onBar(e) {
   switch (btn.dataset.act) {
     case 'reset': return frameTo('iso');
     case 'proj': return setProjection(camera !== ortho);
+    case 'display': {
+      const open = els.display.hidden;
+      els.display.hidden = !open;
+      btn.setAttribute('aria-expanded', String(open));
+      return;
+    }
     case 'edges': {
       edgesOn = !edgesOn;
       save(CONFIG.LS_EDGES, edgesOn);
@@ -537,9 +758,139 @@ function onBar(e) {
   }
 }
 
+/* ── WASD / QE fly navigation ────────────────────────────────────────────── */
+
+const MOVE_KEYS = {
+  KeyW: 'fwd', KeyS: 'back', KeyA: 'left', KeyD: 'right',
+  KeyQ: 'down', KeyE: 'up',
+};
+const held = new Set();
+let flying = false;
+let lastMove = 0;
+let modelRadius = 20;
+
 function onKey(e) {
-  const keys = { 1: 'NE', 2: 'NW', 3: 'SE', 4: 'SW', 5: 'Top' };
-  if (keys[e.key]) { e.preventDefault(); frameTo(keys[e.key]); }
+  const presets = { 1: 'NE', 2: 'NW', 3: 'SE', 4: 'SW', 5: 'Top' };
+  if (presets[e.key]) { e.preventDefault(); frameTo(presets[e.key]); return; }
+
+  if (MOVE_KEYS[e.code] && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault();
+    if (!held.has(e.code)) {
+      held.add(e.code);
+      startFlying();
+    }
+  }
+}
+
+function onKeyUp(e) {
+  if (MOVE_KEYS[e.code]) {
+    held.delete(e.code);
+    if (!held.size) stopFlying();
+  }
+}
+
+function startFlying() {
+  if (flying) return;
+  flying = true;
+  lastMove = performance.now();
+  els.keys.classList.add('is-live');
+  requestRender();
+}
+
+function stopFlying() {
+  flying = false;
+  held.clear();
+  els.keys.classList.remove('is-live');
+}
+
+/**
+ * Moves the camera and its orbit target together, so releasing the keys hands
+ * a coherent pivot back to OrbitControls instead of spinning around wherever
+ * the target was left behind.
+ */
+function step(now) {
+  const dt = Math.min((now - lastMove) / 1000, 0.1);
+  lastMove = now;
+  if (!held.size) return false;
+
+  const speed = modelRadius * CONFIG.MOVE_SPEED * dt * (shiftDown ? 3 : 1);
+
+  const forward = new THREE.Vector3();
+  camera.getWorldDirection(forward);
+  const flat = new THREE.Vector3(forward.x, 0, forward.z);
+  // Looking straight down leaves no horizontal heading to walk along.
+  if (flat.lengthSq() < 1e-6) flat.set(0, 0, -1); else flat.normalize();
+  const strafe = new THREE.Vector3().crossVectors(flat, new THREE.Vector3(0, 1, 0));
+
+  const move = new THREE.Vector3();
+  for (const code of held) {
+    switch (MOVE_KEYS[code]) {
+      case 'fwd': move.add(flat); break;
+      case 'back': move.sub(flat); break;
+      case 'left': move.sub(strafe); break;
+      case 'right': move.add(strafe); break;
+      case 'up': move.y += 1; break;
+      case 'down': move.y -= 1; break;
+    }
+  }
+  if (move.lengthSq() === 0) return false;
+  move.normalize().multiplyScalar(speed);
+
+  if (camera === ortho) {
+    // Translating an orthographic camera along its view axis changes nothing
+    // on screen, so forward/back becomes zoom instead.
+    const fwdAmount = (held.has('KeyW') ? 1 : 0) - (held.has('KeyS') ? 1 : 0);
+    if (fwdAmount) {
+      ortho.zoom = THREE.MathUtils.clamp(
+        ortho.zoom * (1 + fwdAmount * dt * 1.6), controls.minZoom, controls.maxZoom
+      );
+      ortho.updateProjectionMatrix();
+    }
+    // Strafing and rising still read fine in ortho, so keep only the part of
+    // the movement that lies across the view axis.
+    const planar = move.clone().projectOnPlane(forward.clone().normalize());
+    camera.position.add(planar);
+    controls.target.add(planar);
+  } else {
+    camera.position.add(move);
+    controls.target.add(move);
+  }
+  return true;
+}
+
+let shiftDown = false;
+addEventListener('keydown', (e) => { if (e.key === 'Shift') shiftDown = true; });
+addEventListener('keyup', (e) => { if (e.key === 'Shift') shiftDown = false; });
+
+/* ── display grading ─────────────────────────────────────────────────────── */
+
+let grade = {
+  contrast: load(CONFIG.LS_CONTRAST, CONFIG.CONTRAST),
+  saturate: load(CONFIG.LS_SATURATE, CONFIG.SATURATION),
+  shadow: load(CONFIG.LS_SHADOW, CONFIG.SHADOW_OPACITY),
+};
+
+/**
+ * Contrast and saturation ride on a CSS filter over the canvas — it is GPU
+ * composited, needs no re-render, and so tracks the slider live. Shadow
+ * strength is a real material property, so that one does re-render.
+ */
+function applyGrade() {
+  renderer.domElement.style.filter =
+    `contrast(${grade.contrast.toFixed(2)}) saturate(${grade.saturate.toFixed(2)})`;
+  ground.material.opacity = grade.shadow;
+
+  host.querySelector('#in-contrast').value = grade.contrast;
+  host.querySelector('#in-saturate').value = grade.saturate;
+  host.querySelector('#in-shadow').value = grade.shadow;
+  host.querySelector('#out-contrast').value = `${Math.round(grade.contrast * 100)}%`;
+  host.querySelector('#out-saturate').value = `${Math.round(grade.saturate * 100)}%`;
+  host.querySelector('#out-shadow').value = `${Math.round(grade.shadow * 100)}%`;
+
+  save(CONFIG.LS_CONTRAST, grade.contrast);
+  save(CONFIG.LS_SATURATE, grade.saturate);
+  save(CONFIG.LS_SHADOW, grade.shadow);
+  requestRender();
 }
 
 function syncToggles() {

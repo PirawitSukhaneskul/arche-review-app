@@ -224,6 +224,9 @@ always Y-up, so set `"modelUp": "Y"`.
 
 | Key | Action |
 | --- | --- |
+| `W` `A` `S` `D` | Walk forward / left / back / right |
+| `Q` `E` | Down / up |
+| `Shift` | Move 3× faster |
 | `1` – `5` | Model view presets: NE, NW, SE, SW, Top |
 | `←` `→` on the divider | Nudge the split (hold `Shift` for bigger steps) |
 | `Home` on the divider | Reset the split to 50/50 |

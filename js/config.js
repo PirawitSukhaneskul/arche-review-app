@@ -35,8 +35,46 @@ export const CONFIG = {
   GROUND_SIZE: 400,        // the neutral ground plane the shadow falls on
   GROUND_DROP: 0.01,       // sits just under y=0 so it cannot z-fight the base
   MODEL_CACHE_MAX: 3,
-  EDGE_ANGLE_DEG: 28,
+
+  // ── Model look ─────────────────────────────────────────────────────────
+  // Starting point for the display sliders. The client can push these around
+  // live and the choice is remembered per browser.
+  EXPOSURE: 1.05,
+  CONTRAST: 1.12,
+  SATURATION: 1.35,        // flat SketchUp faces, not a washed-out film look
+  SHADOW_OPACITY: 0.30,
+
+  // ── Fly navigation ─────────────────────────────────────────────────────
+  // Fraction of the model radius travelled per second; Shift triples it.
+  MOVE_SPEED: 0.9,
+  // Crease angle for the overlaid edges. Geometry is welded on position first,
+  // so this only keeps genuine silhouette and crease lines, not triangulation.
+  EDGE_ANGLE_DEG: 30,
+  WELD_TOLERANCE: 1e-4,
   EDGE_TRI_LIMIT: 60000,   // skip edge generation above this per-mesh count
+  EDGE_COLOR: 0x2C2A27,
+  EDGE_OPACITY: 1.0,       // was 0.35 — the drawn linework reads far stronger
+
+  // Lawn: keep the texture for grain, lifted to a light olive.
+  GRASS_COLOR: 0xC3CE9B,
+  GRASS_EMISSIVE: 0.16,    // stops the tint from dragging the texture dark
+  GRASS_ROUGHNESS: 0.95,
+
+  /**
+   * Programme colours on the model are snapped to the plan legend so the two
+   * drawings read as one set. Matching is by hue, so it survives whatever the
+   * SketchUp author actually picked. Greys, whites and anything textured are
+   * left alone — only flat saturated faces are remapped.
+   */
+  LEGEND: {
+    athlete: 0x7D9B63,
+    public: 0xD98E4F,
+    cafe: 0xE3B94F,
+    staff: 0xA3BDD1,
+    phase2: 0xA87BA0,
+    water: 0x58AEB5,
+  },
+  LEGEND_MIN_SATURATION: 0.18,
   CAM_PADDING: 1.08,       // 8% around the fitted bounding box
   LARGE_MODEL_WARN_MB: 25,
 
@@ -45,4 +83,7 @@ export const CONFIG = {
   LS_FEEDBACK: 'arche.feedback',
   LS_EDGES: 'arche.edges',
   LS_PROJECTION: 'arche.projection',
+  LS_CONTRAST: 'arche.contrast',
+  LS_SATURATE: 'arche.saturate',
+  LS_SHADOW: 'arche.shadow',
 };
