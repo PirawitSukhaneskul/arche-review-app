@@ -122,9 +122,10 @@ not an up-front one.
 
 ### Where the Meeting 2 sheets came from
 
-`Arche_Aquatics_Meeting2_3Options.pdf` is 12 pages of A3 landscape. Each option
-has **two** sheets — ชั้น 1 then ชั้น 2 — so an option's plan file is a two-page
-PDF and the plan pane's strip becomes a floor switcher:
+`03_Submission/Arche_Aquatics_Meeting2_3Options.pdf` is 12 pages of A3
+landscape — always take the copy in `03_Submission/`, not the working copy one
+folder up. Each option has **two** sheets — ชั้น 1 then ชั้น 2 — so an option's
+plan file is a two-page PDF and the plan pane's strip becomes a floor switcher:
 
 | Option | Deck pages | File |
 | --- | --- | --- |
