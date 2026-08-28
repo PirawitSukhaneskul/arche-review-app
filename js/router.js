@@ -16,10 +16,12 @@ let suppress = false;
 export function parseHash(hash = location.hash) {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean);
 
-  if (parts[0] === 'feedback') return { view: 'feedback' };
+  if (parts[0] === 'feedback') return { view: 'feedback', meetingId: null };
   if (!parts.length) return { view: 'meeting', meetingId: null };
 
   const [meetingId, itemId, mode] = parts;
+  // Every meeting keeps its own sheet, so an earlier round stays readable.
+  if (itemId === 'feedback') return { view: 'feedback', meetingId };
   if (!itemId) return { view: 'meeting', meetingId };
 
   return {
@@ -31,7 +33,9 @@ export function parseHash(hash = location.hash) {
 }
 
 export function hashFor(route) {
-  if (route.view === 'feedback') return '#/feedback';
+  if (route.view === 'feedback') {
+    return route.meetingId ? `#/${route.meetingId}/feedback` : '#/feedback';
+  }
   if (route.view === 'item') {
     const tail = route.mode ? `/${route.mode}` : '';
     return `#/${route.meetingId}/${route.itemId}${tail}`;

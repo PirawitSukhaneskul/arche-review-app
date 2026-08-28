@@ -245,19 +245,31 @@ function initPan() {
 
 /* ── multi-page strip ────────────────────────────────────────────────────── */
 
+/**
+ * One button per page. A sheet that declares `pages` in the manifest — M2's
+ * two-storey options — gets the floor names instead of bare page numbers, so
+ * the client picks "ชั้น 2" rather than guessing what page 2 holds.
+ */
 function buildStrip() {
   const n = doc?.numPages ?? 1;
   els.strip.hidden = n <= 1;
   if (n <= 1) { els.strip.replaceChildren(); return; }
 
-  els.strip.replaceChildren(...Array.from({ length: n }, (_, i) => {
+  const named = (current?.pages ?? []).filter((p) => p.no <= n);
+  const entries = named.length
+    ? named
+    : Array.from({ length: n }, (_, i) => ({ no: i + 1, label: String(i + 1), sub: '' }));
+
+  els.strip.classList.toggle('plan__strip--named', named.length > 0);
+
+  els.strip.replaceChildren(...entries.map((p) => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'mono';
-    b.textContent = String(i + 1);
-    b.setAttribute('aria-label', `หน้า ${i + 1} / Page ${i + 1}`);
-    if (i + 1 === pageNo) b.setAttribute('aria-current', 'true');
-    b.addEventListener('click', () => gotoPage(i + 1));
+    b.className = named.length ? '' : 'mono';
+    b.textContent = p.label;
+    b.setAttribute('aria-label', p.sub ? `${p.label} / ${p.sub}` : `หน้า ${p.no} / Page ${p.no}`);
+    if (p.no === pageNo) b.setAttribute('aria-current', 'true');
+    b.addEventListener('click', () => gotoPage(p.no));
     return b;
   }));
 }

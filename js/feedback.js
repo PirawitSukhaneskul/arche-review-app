@@ -3,30 +3,52 @@ import { esc } from './ui-rail.js';
 
 /**
  * Client feedback form. Mirrors the printed feedback sheet in the drawing set
- * so the two match one-for-one.
+ * so the two match one-for-one — and each meeting prints its own sheet:
+ *
+ *   "rank"   M1 · six layouts   → top three, three dropped, why
+ *   "choose" M2 · three options → pick one to develop, what to keep, what to fix
  *
  * Every path out of here works with no network: autosave to localStorage,
- * Download .json, Copy as text, and a pre-filled mailto: as the last resort.
+ * print to PDF, Copy as text, and a pre-filled mailto: as the last resort.
  */
 
 const TOP_N = 3;
 const DROP_N = 3;
 
 let host = null;
+let meeting = null;
+let shape = 'rank';
 let items = [];
 let state = null;
 let saveTimer = 0;
 
-export function renderFeedback(container, data) {
+export function renderFeedback(container, data, forMeeting = null) {
   host = container;
-  items = data.meetings.find((m) => m.status === 'ready')?.items ?? [];
+  meeting = forMeeting
+    ?? [...data.meetings].reverse().find((m) => m.status === 'ready')
+    ?? data.meetings[0];
+  shape = meeting.feedbackForm === 'choose' ? 'choose' : 'rank';
+  items = meeting.items ?? [];
   state = restore() ?? blank();
 
-  host.innerHTML = template();
+  host.innerHTML = shape === 'choose' ? templateChoose() : template();
   bind();
   hydrate();
-  refreshOptionLists();
+  if (shape === 'rank') refreshOptionLists();
   showSavedStamp(state.savedAt);
+}
+
+/** M1's draft keeps the original key so an in-progress sheet is not orphaned. */
+function storageKey() {
+  return meeting.id === 'm1' ? CONFIG.LS_FEEDBACK : `${CONFIG.LS_FEEDBACK}.${meeting.id}`;
+}
+
+function meetingName() {
+  return `Meeting ${meeting.no} · ${meeting.title}`;
+}
+
+function subject() {
+  return `${CONFIG.FORM_SUBJECT} Meeting ${meeting.no}`;
 }
 
 /* ── shape ───────────────────────────────────────────────────────────────── */
@@ -40,6 +62,17 @@ function today() {
 }
 
 function blank() {
+  if (shape === 'choose') {
+    return {
+      name: '',
+      date: today(),
+      choice: '',
+      keep: '',
+      fix: '',
+      comments: '',
+      savedAt: null,
+    };
+  }
   return {
     name: '',
     date: today(),
@@ -48,6 +81,96 @@ function blank() {
     comments: '',
     savedAt: null,
   };
+}
+
+/**
+ * M2's sheet: one choice, and the two questions that actually move the design
+ * on — what to keep, and what still worries them. Options are radio cards so
+ * the pick is one tap on a phone at the meeting table.
+ */
+function templateChoose() {
+  return `
+  <form class="fb" id="fb-form" novalidate>
+    <header class="fb__head">
+      <span class="mono fb__tag">FB-0${esc(meeting.no)}</span>
+      <h2>เลือกทางเลือก และเขียนความเห็น
+        <small>${esc(meetingName())}</small></h2>
+      <p class="fb__saved mono" id="fb-saved" aria-live="polite"></p>
+    </header>
+
+    <p class="fb__hint">เลือก 1 ทางเลือกเพื่อพัฒนาต่อในขั้น Design Development
+      ไม่จำเป็นต้องเลือกแบบใดแบบหนึ่งทั้งหมด หยิบข้อดีของแต่ละแบบมารวมกันในรอบถัดไปได้</p>
+
+    <div class="fb__row">
+      <label class="field">
+        <span class="field__label">ผู้ให้ความเห็น <small>Name</small> <b aria-hidden="true">*</b></span>
+        <input type="text" id="fb-name" name="name" required autocomplete="name">
+        <span class="field__err" id="err-name" hidden>กรุณากรอกชื่อ / Name is required</span>
+      </label>
+      <label class="field field--sm">
+        <span class="field__label">วันที่ <small>Date</small></span>
+        <input type="date" id="fb-date" name="date" class="mono">
+      </label>
+    </div>
+
+    <fieldset class="fb__set">
+      <legend><span class="mono">A</span> ทางเลือกที่เลือก <small>Option to develop</small> <b aria-hidden="true">*</b></legend>
+      <ul class="picks">
+        ${items.map((it) => `
+          <li>
+            <label class="pick">
+              <input type="radio" name="choice" value="${esc(it.id)}" data-role="choice">
+              <span class="pick__body">
+                <span class="mono pick__sheet">${esc(it.sheet)}</span>
+                <span class="pick__label">${esc(it.label)}</span>
+                ${it.tagline ? `<span class="pick__tagline">${esc(it.tagline)}</span>` : ''}
+                ${it.origin ? `<span class="pick__origin">${esc(it.origin)}</span>` : ''}
+              </span>
+            </label>
+          </li>`).join('')}
+      </ul>
+      <p class="fb__err" id="err-choice" hidden>เลือก 1 ทางเลือก / Pick one option</p>
+    </fieldset>
+
+    <label class="field">
+      <span class="field__label"><span class="mono">B</span> สิ่งที่ชอบ และอยากให้คงไว้
+        <small>What to keep</small></span>
+      <textarea rows="5" id="fb-keep"></textarea>
+    </label>
+
+    <label class="field">
+      <span class="field__label"><span class="mono">C</span> สิ่งที่อยากให้แก้ หรือยังไม่มั่นใจ
+        <small>What to fix, or still unsure about</small></span>
+      <textarea rows="5" id="fb-fix"></textarea>
+    </label>
+
+    <label class="field">
+      <span class="field__label">ความเห็นเพิ่มเติม <small>Other comments</small></span>
+      <textarea rows="4" id="fb-comments"></textarea>
+    </label>
+
+    <!-- honeypot: real people never see this, bots fill it in -->
+    <div class="hp" aria-hidden="true">
+      <label>Company website<input type="text" id="fb-hp" name="_gotcha" tabindex="-1" autocomplete="off"></label>
+    </div>
+
+    <div class="fb__actions">
+      <button type="button" class="btn" data-act="pdf">ดาวน์โหลด PDF · Download PDF</button>
+      <button type="submit" class="btn btn--primary" id="fb-submit">ส่งเมล์ · Send</button>
+    </div>
+
+    <p class="fb__status" id="fb-status" role="status" aria-live="polite"></p>
+
+    <div class="fb__fallback" id="fb-fallback" hidden>
+      <p>ส่งไม่สำเร็จ แต่ข้อมูลยังอยู่ครบ · The send failed, nothing was lost.</p>
+      <div class="fb__actions">
+        <a class="btn" id="fb-mailto" href="#">เปิดอีเมล · Open email</a>
+        <button type="button" class="btn" data-act="copy">คัดลอกข้อความ · Copy as text</button>
+      </div>
+    </div>
+
+    <div class="fb__receipt" id="fb-receipt" hidden></div>
+  </form>`;
 }
 
 function template() {
@@ -166,6 +289,9 @@ function onInput(e) {
   if (t.id === 'fb-name') state.name = t.value;
   else if (t.id === 'fb-date') state.date = t.value;
   else if (t.id === 'fb-comments') state.comments = t.value;
+  else if (t.id === 'fb-keep') state.keep = t.value;
+  else if (t.id === 'fb-fix') state.fix = t.value;
+  else if (role === 'choice') state.choice = t.value;
   else if (role === 'top-option') { state.top[+t.dataset.i].option = t.value; autoFillDropped(); }
   else if (role === 'top-like') state.top[+t.dataset.i].like = t.value;
   else if (role === 'top-dislike') state.top[+t.dataset.i].dislike = t.value;
@@ -186,6 +312,15 @@ function hydrate() {
   host.querySelector('#fb-name').value = state.name;
   host.querySelector('#fb-date').value = state.date;
   host.querySelector('#fb-comments').value = state.comments;
+
+  if (shape === 'choose') {
+    host.querySelector('#fb-keep').value = state.keep;
+    host.querySelector('#fb-fix').value = state.fix;
+    const picked = q(`[data-role="choice"][value="${CSS.escape(state.choice || ' ')}"]`);
+    if (picked) picked.checked = true;
+    updateMailto();
+    return;
+  }
 
   state.top.forEach((b, i) => {
     q(`[data-role="top-like"][data-i="${i}"]`).value = b.like;
@@ -250,7 +385,7 @@ function scheduleSave() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     state.savedAt = new Date().toISOString();
-    try { localStorage.setItem(CONFIG.LS_FEEDBACK, JSON.stringify(state)); }
+    try { localStorage.setItem(storageKey(), JSON.stringify(state)); }
     catch { /* private mode — the download/copy fallbacks still work */ }
     showSavedStamp(state.savedAt);
   }, 250);
@@ -258,10 +393,11 @@ function scheduleSave() {
 
 function restore() {
   try {
-    const raw = localStorage.getItem(CONFIG.LS_FEEDBACK);
+    const raw = localStorage.getItem(storageKey());
     if (!raw) return null;
     const s = JSON.parse(raw);
     const base = blank();
+    if (shape === 'choose') return { ...base, ...s };
     return {
       ...base, ...s,
       top: base.top.map((b, i) => ({ ...b, ...(s.top?.[i] || {}) })),
@@ -281,17 +417,34 @@ function showSavedStamp(iso) {
 
 function labelFor(id) {
   const it = items.find((x) => x.id === id);
-  return it ? `${it.sheet} ${it.label}` : '—';
+  if (!it) return '—';
+  return it.tagline ? `${it.sheet} ${it.label} · ${it.tagline}` : `${it.sheet} ${it.label}`;
 }
 
 function asText() {
   const L = [];
   L.push('ARCHE AQUATICS — CLIENT FEEDBACK');
-  L.push('Meeting 1 · 6 Layouts');
+  L.push(meetingName());
   L.push('');
   L.push(`ผู้ให้ความเห็น / Name : ${state.name || '—'}`);
   L.push(`วันที่ / Date        : ${state.date || '—'}`);
   L.push('');
+
+  if (shape === 'choose') {
+    L.push('— ทางเลือกที่เลือก / OPTION TO DEVELOP —');
+    L.push(labelFor(state.choice));
+    L.push('');
+    L.push('— สิ่งที่ชอบ และอยากให้คงไว้ / WHAT TO KEEP —');
+    L.push(state.keep || '—');
+    L.push('');
+    L.push('— สิ่งที่อยากให้แก้ หรือยังไม่มั่นใจ / WHAT TO FIX —');
+    L.push(state.fix || '—');
+    L.push('');
+    L.push('— ความเห็นเพิ่มเติม / OTHER COMMENTS —');
+    L.push(state.comments || '—');
+    return L.join('\n');
+  }
+
   L.push('— 3 แบบที่ชอบที่สุด / TOP 3 PREFERRED —');
   state.top.forEach((b, i) => {
     L.push(`${i + 1}. ${labelFor(b.option)}`);
@@ -311,24 +464,38 @@ function asText() {
 }
 
 function payload() {
-  return {
-    _subject: CONFIG.FORM_SUBJECT,
+  const common = {
+    _subject: subject(),
     project: 'Arche Aquatics',
-    meeting: 'Meeting 1 — 6 Layouts',
+    meeting: meetingName(),
     name: state.name,
     date: state.date,
-    top: state.top.map((b) => ({ ...b, optionLabel: labelFor(b.option) })),
-    dropped: state.dropped.map((b) => ({ ...b, optionLabel: labelFor(b.option) })),
     comments: state.comments,
     submittedAt: new Date().toISOString(),
     text: asText(),
+  };
+
+  if (shape === 'choose') {
+    return {
+      ...common,
+      choice: state.choice,
+      choiceLabel: labelFor(state.choice),
+      keep: state.keep,
+      fix: state.fix,
+    };
+  }
+
+  return {
+    ...common,
+    top: state.top.map((b) => ({ ...b, optionLabel: labelFor(b.option) })),
+    dropped: state.dropped.map((b) => ({ ...b, optionLabel: labelFor(b.option) })),
   };
 }
 
 function updateMailto() {
   const a = host.querySelector('#fb-mailto');
   a.href = `mailto:${encodeURIComponent(CONFIG.FALLBACK_EMAIL)}`
-    + `?subject=${encodeURIComponent(CONFIG.FORM_SUBJECT)}`
+    + `?subject=${encodeURIComponent(subject())}`
     + `&body=${encodeURIComponent(asText())}`;
 }
 
@@ -369,19 +536,50 @@ function downloadPdf() {
     document.body.append(sheet);
   }
 
-  sheet.innerHTML = `
+  const head = `
     <header class="ps__head">
       <div>
         <h1>ความเห็นลูกค้า <small>Client feedback</small></h1>
-        <p class="ps__meta">Arche Aquatics · โรงเรียนว่ายน้ำ · Meeting 1 — 6 Layouts</p>
+        <p class="ps__meta">Arche Aquatics · โรงเรียนว่ายน้ำ · ${esc(meetingName())}</p>
       </div>
-      <span class="mono ps__code">FB-01</span>
+      <span class="mono ps__code">FB-0${esc(meeting.no)}</span>
     </header>
 
     <table class="ps__id">
       ${row('ผู้ให้ความเห็น / Name', state.name)}
       ${row('วันที่ / Date', state.date)}
-    </table>
+    </table>`;
+
+  const foot = `
+    <footer class="ps__foot mono">
+      WIN ARCHITECT · พีรวิชญ์ สุขเณศกุล · ${esc(state.date || '')}
+    </footer>`;
+
+  if (shape === 'choose') {
+    sheet.innerHTML = `
+      ${head}
+
+      <h2><span class="mono">A</span> ทางเลือกที่เลือก <small>Option to develop</small></h2>
+      <p class="ps__choice mono">${esc(labelFor(state.choice))}</p>
+
+      <h2><span class="mono">B</span> สิ่งที่ชอบ และอยากให้คงไว้ <small>What to keep</small></h2>
+      <p class="ps__comments">${esc(state.keep || '—')}</p>
+
+      <h2><span class="mono">C</span> สิ่งที่อยากให้แก้ หรือยังไม่มั่นใจ <small>What to fix</small></h2>
+      <p class="ps__comments">${esc(state.fix || '—')}</p>
+
+      <h2><span class="mono">D</span> ความเห็นเพิ่มเติม <small>Other comments</small></h2>
+      <p class="ps__comments">${esc(state.comments || '—')}</p>
+
+      ${foot}`;
+
+    status('เลือก “Save as PDF” ในหน้าต่างพิมพ์ · Choose “Save as PDF” in the print dialog', 'ok');
+    window.print();
+    return;
+  }
+
+  sheet.innerHTML = `
+    ${head}
 
     <h2><span class="mono">A</span> 3 แบบที่ชอบที่สุด <small>Top 3 preferred</small></h2>
     <table class="ps__grid">
@@ -419,9 +617,7 @@ function downloadPdf() {
     <h2><span class="mono">C</span> ความเห็นเพิ่มเติม <small>Other comments</small></h2>
     <p class="ps__comments">${esc(state.comments || '—')}</p>
 
-    <footer class="ps__foot mono">
-      WIN ARCHITECT · พีรวิชญ์ สุขเณศกุล · ${esc(state.date || '')}
-    </footer>`;
+    ${foot}`;
 
   // Set the hint first, because print() blocks until the dialog closes. Called
   // straight out rather than from requestAnimationFrame — rAF does not fire in
@@ -438,6 +634,13 @@ function validate() {
   const nameErr = host.querySelector('#err-name');
   nameErr.hidden = !!state.name.trim();
   if (!state.name.trim()) { ok = false; host.querySelector('#fb-name').focus(); }
+
+  if (shape === 'choose') {
+    const choiceErr = host.querySelector('#err-choice');
+    choiceErr.hidden = !!state.choice;
+    if (!state.choice) ok = false;
+    return ok;
+  }
 
   const picks = state.top.map((b) => b.option).filter(Boolean);
   const topErr = host.querySelector('#err-top');
@@ -483,7 +686,7 @@ async function onSubmit(e) {
     // and puts the draft straight back — the client reloads and thinks the
     // send never happened.
     clearTimeout(saveTimer);
-    try { localStorage.removeItem(CONFIG.LS_FEEDBACK); } catch { /* no-op */ }
+    try { localStorage.removeItem(storageKey()); } catch { /* no-op */ }
   } catch (err) {
     // Nothing is cleared on failure — every field stays exactly as typed.
     status(`ส่งไม่สำเร็จ (${err.message}) · Send failed.`, 'err');

@@ -13,7 +13,9 @@ export const CONFIG = {
   // Used by the mailto: fallback when the network is unavailable.
   FALLBACK_EMAIL: 'pirawit.win@gmail.com',
 
-  FORM_SUBJECT: 'Arche Aquatics — Feedback Meeting 1',
+  // The mail subject now carries the meeting number the sheet was sent from,
+  // so this is only the shape of it. See feedback.js → subject().
+  FORM_SUBJECT: 'Arche Aquatics — Feedback',
 
   // ── Data ───────────────────────────────────────────────────────────────
   MANIFEST_URL: 'data/manifest.json',

@@ -120,6 +120,87 @@ Each sheet is ~1.6 MB because it carries the presentation's photography. They
 load one at a time, only when an option is opened, so this is a per-option cost,
 not an up-front one.
 
+### Where the Meeting 2 sheets came from
+
+`Arche_Aquatics_Meeting2_3Options.pdf` is 12 pages of A3 landscape. Each option
+has **two** sheets — ชั้น 1 then ชั้น 2 — so an option's plan file is a two-page
+PDF and the plan pane's strip becomes a floor switcher:
+
+| Option | Deck pages | File |
+| --- | --- | --- |
+| 1 | 3–4 | `assets/meeting-2/plans/opt-1.pdf` |
+| 2 | 5–6 | `assets/meeting-2/plans/opt-2.pdf` |
+| 3 | 7–8 | `assets/meeting-2/plans/opt-3.pdf` |
+
+Pages 2, 9, 10 and 11–12 (brief, comparison table, cost frame, printed decision
+sheet) are split out to `assets/meeting-2/docs/`, which is **gitignored** — the
+repo is public, and the cost frame and the signature sheet are not for the open
+web. They stay local; the app links them only if a `docs` array is present on
+the meeting in the manifest, which it deliberately is not. Re-split with:
+
+```python
+import pymupdf
+src = pymupdf.open('Arche_Aquatics_Meeting2_3Options.pdf')
+for opt, (a, b) in {1: (2, 3), 2: (4, 5), 3: (6, 7)}.items():   # 0-based
+    out = pymupdf.open()
+    out.insert_pdf(src, from_page=a, to_page=b)
+    out.save(f'assets/meeting-2/plans/opt-{opt}.pdf', garbage=4, deflate=True)
+```
+
+These sheets carry no 3D massing block, so the M2 thumbnails are a crop of the
+ชั้น 1 drawing area instead:
+
+```python
+clip = pymupdf.Rect(380, 140, 1170, 650)          # the drawing, minus the notes column
+pix = src[2].get_pixmap(clip=clip, matrix=pymupdf.Matrix(480 / clip.width, 480 / clip.width))
+```
+
+### The four-axis notes (M2 onwards)
+
+Everything in an option sheet's left-hand column also lives in the manifest, as
+text, so the app can show it at any zoom and compare options side by side. The
+extra item fields are all optional — an M1-shaped item with none of them still
+validates:
+
+```json
+"tagline": "คุมทั้งสองสระ + one-way",
+"origin":  "พัฒนาจาก OPTION 4 (Meeting 1)",
+"pages":   [{ "no": 1, "label": "ชั้น 1", "sub": "Ground floor" },
+            { "no": 2, "label": "ชั้น 2", "sub": "Upper floor" }],
+"areas":   [{ "label": "พื้นที่อาคาร ชั้น 1 + ชั้น 2", "value": "538.7", "unit": "ตร.ม." }],
+"axes":    [{ "n": 1, "pros": ["…"], "cons": ["…"] }],
+"verdict": "สรุปในมุมของสถาปนิก …"
+```
+
+The axis *titles* sit on the meeting, not the item, because all three options
+are judged on the same four questions:
+
+```json
+"axes": [{ "n": 1, "title": "สายตาเจ้าหน้าที่", "sub": "จากที่นั่งประจำ มองเห็นอะไร" }],
+"docs": [{ "id": "compare", "label": "ตารางเทียบ 3 ทางเลือก", "sub": "หน้า 9",
+           "file": "assets/meeting-2/docs/compare.pdf" }],
+"brief": "…",
+"feedbackForm": "choose"
+```
+
+`pages` drives the floor strip, `axes` + `areas` + `verdict` drive the
+**ข้อดี / ข้อเสีย** panel (the header toggle, or `Esc` to close) and the compare
+view at `#/<meeting>/compare`.
+
+### Which feedback sheet a meeting asks for
+
+`feedbackForm` on the meeting picks the form, matching that round's printed
+sheet:
+
+| Value | Sheet |
+| --- | --- |
+| `"rank"` | M1 — top three, three dropped, why (the default) |
+| `"choose"` | M2 — pick one option to develop, what to keep, what to fix |
+
+Each meeting keeps its own draft in `localStorage` and its own URL
+(`#/m2/feedback`); bare `#/feedback` opens the newest ready meeting's sheet, and
+so does a bare `#/`.
+
 ### Collada textures
 
 SketchUp writes texture paths like `OPTION%201/Formica_Beige.jpg` — a folder
@@ -151,15 +232,16 @@ Drop the matching files in. No code changes.
 
 ## How to add a meeting
 
-Meetings 2–4 already exist as `"status": "pending"` — they show in the rail,
-dimmed and unclickable, with a **ยังไม่เปิดรอบนี้ / Not open yet** panel.
+Meetings 1 and 2 are `"ready"`. Meetings 3–4 exist as `"status": "pending"` —
+they show in the rail, dimmed and unclickable, with a **ยังไม่เปิดรอบนี้ / Not
+open yet** panel.
 
 To open one:
 
-1. Create `assets/meeting-2/plans|models|thumbs/` and drop the files in.
+1. Create `assets/meeting-3/plans|models|thumbs/` and drop the files in.
 2. In `data/manifest.json`, change that meeting's `"status"` to `"ready"` and
    fill its `items` array using the block above (paths pointing at
-   `assets/meeting-2/…`, sheet numbers `M2-01`, `M2-02`, …).
+   `assets/meeting-3/…`, sheet numbers `M3-01`, `M3-02`, …).
 
 No code changes. A meeting marked `ready` with an empty `items` array is a
 validation error and will say so on screen.
@@ -192,7 +274,8 @@ lighting and shadows look the same no matter what units were exported.
 
 ## Big models
 
-The six Meeting 1 `.dae` files are 0.7–3.4 MB and parse fine. If a future export
+The Meeting 1 `.dae` files are 0.7–3.4 MB and the Meeting 2 ones 5.5–9.1 MB;
+all parse fine. If a future export
 goes over ~25 MB or feels slow, convert it:
 
 ```bash

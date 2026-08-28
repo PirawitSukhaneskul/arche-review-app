@@ -55,10 +55,45 @@ export function renderRail(data, route) {
           a.setAttribute('aria-current', 'true');
         }
         a.innerHTML = `<span class="mono option__sheet">${esc(it.sheet)}</span>
-                       <span class="option__label">${esc(it.label)}</span>`;
+                       <span class="option__label">${esc(it.label)}
+                         ${it.tagline ? `<small>${esc(it.tagline)}</small>` : ''}</span>`;
         li.append(a);
         ul.append(li);
       }
+
+      // Meetings that carry the four-axis notes also get the comparison sheet.
+      if (m.items.some((it) => it.axes?.length)) {
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        a.className = 'option option--compare';
+        a.href = hashFor({ view: 'item', meetingId: m.id, itemId: 'compare' });
+        if (activeItem === 'compare') {
+          a.classList.add('is-active');
+          a.setAttribute('aria-current', 'true');
+        }
+        a.innerHTML = `<span class="mono option__sheet">≡</span>
+                       <span class="option__label">เทียบทางเลือก<small>Compare</small></span>`;
+        li.append(a);
+        ul.append(li);
+      }
+
+      // The sheet for this round. Each meeting keeps its own, so an earlier
+      // round's answers stay readable after a new one opens.
+      {
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        a.className = 'option option--feedback';
+        a.href = hashFor({ view: 'feedback', meetingId: m.id });
+        if (route.view === 'feedback') {
+          a.classList.add('is-active');
+          a.setAttribute('aria-current', 'true');
+        }
+        a.innerHTML = `<span class="mono option__sheet">FB</span>
+                       <span class="option__label">ส่งความเห็นรอบนี้<small>Feedback</small></span>`;
+        li.append(a);
+        ul.append(li);
+      }
+
       group.append(ul);
     }
 

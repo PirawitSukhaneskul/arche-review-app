@@ -159,6 +159,7 @@ a.meeting__head:hover { background: rgba(198, 192, 183, 0.28); }
 .option:hover { background: rgba(198, 192, 183, 0.3); }
 .option__sheet { color: var(--ink-40); flex: none; }
 .option__label { font-size: 13px; }
+.option__label small { display: block; font-size: 11px; color: var(--ink-40); }
 
 /* Active state is a bar AND bold weight — colour is never the only signal. */
 .option.is-active {
@@ -247,6 +248,7 @@ a.meeting__head:hover { background: rgba(198, 192, 183, 0.28); }
 /* ── workspace and split ─────────────────────────────────────────────────── */
 
 .workspace {
+  position: relative;      /* the notes panel overlays it */
   display: grid;
   grid-template-columns: var(--split, 50%) 6px minmax(0, 1fr);
   height: 100%;
@@ -605,6 +607,198 @@ textarea { resize: vertical; min-height: 44px; }
   white-space: pre-wrap; word-break: break-word;
 }
 
+/* ── notes panel: ข้อดี / ข้อเสีย over the plan ───────────────────────────── */
+
+.notes-toggle {
+  flex: none;
+  padding: 5px 12px; font-size: 12px; font-weight: 500;
+  background: transparent; border: 1px solid var(--rule); border-radius: 2px;
+  cursor: pointer;
+  transition: background var(--t) ease-out, color var(--t) ease-out;
+}
+.notes-toggle:hover { background: var(--panel); }
+.notes-toggle[aria-pressed='true'] { background: var(--ink); color: var(--paper); }
+.notes-toggle span { color: var(--ink-40); margin-right: 4px; letter-spacing: -0.08em; }
+.notes-toggle[aria-pressed='true'] span { color: inherit; }
+
+/* Absolute, so the workspace grid — and with it the WebGL canvas — is not
+   relaid out when the panel opens. */
+.notes {
+  position: absolute; z-index: 20;
+  inset: 0 0 0 auto;
+  width: min(440px, 100%);
+  display: flex; flex-direction: column;
+  background: var(--paper);
+  border-left: 1px solid var(--rule);
+}
+
+.notes__head {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px; border-bottom: 1px solid var(--rule);
+  background: var(--panel);
+}
+.notes__id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.notes__sheet { color: var(--ink-40); }
+.notes__label { font-family: var(--font-display); font-weight: 600; font-size: 15px; }
+.notes__tagline { color: var(--athlete); font-weight: 500; font-size: 13px; }
+.notes__close {
+  margin-left: auto; flex: none;
+  width: 28px; height: 28px; line-height: 1;
+  font-size: 20px; background: transparent;
+  border: 1px solid var(--rule); border-radius: 2px; cursor: pointer;
+}
+.notes__close:hover { background: var(--paper); }
+
+.notes__body { overflow-y: auto; padding: 14px; }
+.notes__origin { margin: 0 0 12px; font-size: 12px; color: var(--ink-60); }
+.notes__section + .notes__section { margin-top: 20px; }
+.notes__h {
+  font-size: 13px; margin-bottom: 8px;
+  padding-bottom: 4px; border-bottom: 1px solid var(--rule);
+}
+.notes__h small { font-weight: 400; font-size: 11px; color: var(--ink-60); margin-left: 6px; }
+.notes__caveat { margin: 6px 0 0; font-size: 11px; color: var(--ink-40); }
+.notes__verdict p { margin: 0; font-size: 13px; }
+
+.areas { width: 100%; border-collapse: collapse; }
+.areas th {
+  text-align: left; font-weight: 400; font-size: 12.5px;
+  padding: 3px 8px 3px 0; color: var(--ink-60);
+}
+.areas__v { text-align: right; white-space: nowrap; padding: 3px 4px 3px 0; }
+.areas__u { font-size: 11px; color: var(--ink-40); white-space: nowrap; }
+
+.axis + .axis { margin-top: 14px; }
+.axis__h {
+  display: flex; gap: 8px; align-items: baseline;
+  font-family: var(--font-display); font-weight: 600; font-size: 13px; margin: 0 0 5px;
+}
+.axis__n { color: var(--ink-40); }
+.axis__h small { display: block; font-weight: 400; font-size: 11.5px; color: var(--ink-60); }
+
+.axis__list { list-style: none; margin: 0; padding: 0; }
+.axis__list li {
+  display: grid; grid-template-columns: 14px minmax(0, 1fr);
+  gap: 6px; font-size: 12.5px; line-height: 1.55;
+  padding: 2px 0;
+}
+.axis__list li span[aria-hidden] { font-family: var(--font-mono); text-align: center; }
+.axis__list .is-pro span[aria-hidden] { color: var(--athlete); }
+.axis__list .is-con span[aria-hidden] { color: var(--public); }
+
+/* ── compare view ────────────────────────────────────────────────────────── */
+
+.cmp { padding: 20px 20px 64px; }
+.cmp__head { max-width: 900px; }
+.cmp__head h2 { font-size: 19px; }
+.cmp__head h2 small { display: block; font-weight: 400; font-size: 12.5px; color: var(--ink-60); }
+.cmp__brief { margin: 8px 0 0; font-size: 13px; color: var(--ink-60); }
+.cmp__key { margin: 10px 0 0; font-size: 11px; color: var(--ink-40); }
+
+.cmp__scroll { margin-top: 16px; overflow-x: auto; }
+.cmp__table { width: 100%; min-width: 780px; border-collapse: collapse; }
+.cmp__table th, .cmp__table td {
+  vertical-align: top; text-align: left;
+  padding: 12px 14px 12px 0;
+  border-bottom: 1px solid var(--rule);
+}
+.cmp__table thead th { border-bottom: 2px solid var(--ink); padding-bottom: 8px; }
+
+.cmp__axis-col { width: 150px; }
+.cmp__table tbody th { display: flex; gap: 8px; font-weight: 400; }
+.cmp__n { color: var(--ink-40); }
+.cmp__axis-title { font-family: var(--font-display); font-weight: 600; font-size: 13px; }
+.cmp__axis-title small { display: block; font-weight: 400; font-size: 11.5px; color: var(--ink-60); }
+
+.cmp__opt { display: flex; flex-direction: column; gap: 2px; text-decoration: none; }
+.cmp__opt:hover .cmp__label { color: var(--water); }
+.cmp__sheet { color: var(--ink-40); }
+.cmp__label { font-family: var(--font-display); font-weight: 600; font-size: 15px; }
+.cmp__tagline { color: var(--athlete); font-weight: 500; font-size: 12.5px; }
+.cmp__origin { font-size: 11px; color: var(--ink-40); }
+.cmp__none { color: var(--ink-40); }
+.cmp__areas td { background: var(--panel); }
+
+.cmp__verdicts, .cmp__docs { margin-top: 28px; max-width: 900px; }
+.cmp__verdicts h3, .cmp__docs h3, .grid__docs h3 {
+  font-size: 14px; padding-bottom: 5px; border-bottom: 1px solid var(--rule);
+}
+.cmp__verdicts h3 small, .cmp__docs h3 small, .grid__docs h3 small {
+  font-weight: 400; font-size: 11.5px; color: var(--ink-60); margin-left: 6px;
+}
+.cmp__verdicts dl { margin: 0; }
+.cmp__verdicts div { padding: 10px 0; border-bottom: 1px solid var(--rule); }
+.cmp__verdicts dt { font-family: var(--font-display); font-weight: 600; }
+.cmp__verdicts dt small { font-weight: 400; color: var(--athlete); margin-left: 6px; }
+.cmp__verdicts dd { margin: 3px 0 0; font-size: 13px; color: var(--ink-60); }
+
+/* ── document links ──────────────────────────────────────────────────────── */
+
+.docs { list-style: none; margin: 8px 0 0; padding: 0; }
+.docs a {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 8px 10px; text-decoration: none;
+  border: 1px solid var(--rule); border-radius: 2px;
+  background: var(--paper);
+  transition: border-color var(--t) ease-out;
+}
+.docs li + li { margin-top: 6px; }
+.docs a:hover { border-color: var(--water); }
+.docs__label { font-weight: 500; }
+.docs__sub { color: var(--ink-40); }
+.docs__go { margin-left: auto; color: var(--ink-40); }
+
+/* ── grid additions ──────────────────────────────────────────────────────── */
+
+.grid__brief {
+  margin: 0; padding: 18px 20px 0;
+  max-width: 760px; font-size: 13px; color: var(--ink-60);
+}
+.card__meta { flex-wrap: wrap; }
+.card__tagline {
+  flex-basis: 100%; color: var(--athlete); font-weight: 500; font-size: 12.5px;
+}
+.card__floors { flex-basis: 100%; font-size: 11.5px; color: var(--ink-40); }
+
+.grid__compare {
+  display: flex; align-items: center; gap: 12px;
+  margin: 0 20px; padding: 12px 14px;
+  text-decoration: none;
+  border: 1px solid var(--rule); border-radius: 2px; background: var(--panel);
+  transition: border-color var(--t) ease-out;
+}
+.grid__compare:hover { border-color: var(--water); }
+.grid__compare .mono { color: var(--ink-40); }
+.grid__compare small { display: block; font-size: 11.5px; color: var(--ink-60); }
+.grid__go { margin-left: auto; color: var(--ink-40); }
+
+.grid__docs { margin: 24px 20px 40px; max-width: 760px; }
+
+/* ── feedback: option picker (M2 sheet) ──────────────────────────────────── */
+
+.picks { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.pick { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.pick input { margin-top: 12px; accent-color: var(--athlete); }
+.pick__body {
+  flex: 1; display: flex; flex-direction: column; gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule); border-radius: 2px; background: var(--paper);
+  transition: border-color var(--t) ease-out;
+}
+.pick:hover .pick__body { border-color: var(--water); }
+.pick input:checked + .pick__body { border-color: var(--athlete); border-width: 2px; padding: 9px 11px; }
+.pick__sheet { color: var(--ink-40); }
+.pick__label { font-family: var(--font-display); font-weight: 600; }
+.pick__tagline { color: var(--athlete); font-weight: 500; font-size: 12.5px; }
+.pick__origin { font-size: 11.5px; color: var(--ink-40); }
+
+/* ── plan pane: named floor strip ────────────────────────────────────────── */
+
+.plan__strip--named button {
+  min-width: 0; padding: 4px 12px; font-size: 12px;
+  font-family: var(--font-body); text-transform: none; letter-spacing: 0;
+}
+
 /* ═══ 760 – 1099 px: icon rail, split stacks vertically ═══════════════════ */
 
 @media (max-width: 1099px) {
@@ -667,6 +861,13 @@ textarea { resize: vertical; min-height: 44px; }
   .fb { padding: 18px 14px 56px; }
   .fb__rank { display: none; }
   .btn--quiet { margin-left: 0; }
+
+  .grid__brief { padding: 14px 14px 0; }
+  .grid__compare, .grid__docs { margin-inline: 14px; }
+  .cmp { padding: 14px 14px 56px; }
+  .notes { width: 100%; border-left: 0; }
+  .notes-toggle { padding: 5px 8px; font-size: 11px; }
+  .notes-toggle span { display: none; }
 }
 
 @media (min-width: 760px) {
@@ -735,6 +936,11 @@ textarea { resize: vertical; min-height: 44px; }
     margin: 0; padding: 7px;
     border: 0.5pt solid #999; min-height: 22mm;
     white-space: pre-wrap;
+  }
+
+  .ps__choice {
+    margin: 0; padding: 7px;
+    border: 1pt solid #000; font-size: 12pt;
   }
 
   .ps__foot {

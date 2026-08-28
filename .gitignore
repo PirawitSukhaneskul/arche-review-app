@@ -6,3 +6,6 @@ desktop.ini
 
 # local preview config
 .claude/
+
+# client documents that stay off the public site
+assets/meeting-*/docs/
