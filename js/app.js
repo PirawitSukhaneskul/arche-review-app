@@ -6,16 +6,10 @@ import { initSplit } from './view-split.js';
 import { showPlan, planLinks } from './view-plan.js';
 import { showModel, resizeModel } from './view-model.js';
 import { renderFeedback } from './feedback.js';
-import { renderCompare, hasCompare } from './view-compare.js';
-import { initNotes, setNotes, showNotes, notesAvailable } from './view-notes.js';
-
-/** Reserved option id: `#/m2/compare` is the comparison view, not an option. */
-const COMPARE_ID = 'compare';
 
 const app = document.getElementById('app');
 const views = {
   grid: document.getElementById('view-grid'),
-  compare: document.getElementById('view-compare'),
   empty: document.getElementById('view-empty'),
   feedback: document.getElementById('view-feedback'),
   workspace: document.getElementById('view-workspace'),
@@ -24,13 +18,10 @@ const header = {
   sheet: document.getElementById('header-sheet'),
   title: document.getElementById('header-title'),
   switcher: document.getElementById('switcher'),
-  notes: document.getElementById('notes-toggle'),
   links: document.getElementById('header-links'),
   raw: document.getElementById('link-raw'),
   dl: document.getElementById('link-dl'),
 };
-
-let notesOpen = false;
 
 let data = null;
 let route = null;
@@ -47,9 +38,6 @@ async function boot() {
 
   initRail();
   initSplit();
-  initNotes(() => setNotesOpen(false));
-
-  header.notes.addEventListener('click', () => setNotesOpen(!notesOpen));
 
   header.switcher.addEventListener('click', (e) => {
     const mode = e.target.closest('button')?.dataset.mode;
@@ -74,8 +62,6 @@ function allowedModes() {
 function onRoute(next) {
   route = next;
 
-  setNotesOpen(false);
-
   if (route.view === 'feedback') {
     const m = findMeeting(data, route.meetingId) ?? latestReady() ?? data.meetings[0];
     route.meetingId = m.id;
@@ -97,11 +83,14 @@ function onRoute(next) {
   if (meeting.status !== 'ready') {
     show('empty');
     setHeader({ sheet: `M${meeting.no}`, title: meeting.title });
+    // A dead end needs a way out: send them to the round that is open.
+    const open = latestReady();
     views.empty.innerHTML = `
       <div class="empty">
         <span class="mono empty__tag">M${meeting.no}</span>
         <h2>ยังไม่เปิดรอบนี้ <small>Not open yet</small></h2>
         <p class="empty__title">${esc(meeting.title)}${meeting.titleTh ? ` · ${esc(meeting.titleTh)}` : ''}</p>
+        ${open ? `<a class="btn" href="#/${esc(open.id)}">ไปที่รอบล่าสุด · Go to M${open.no}</a>` : ''}
       </div>`;
     return;
   }
@@ -110,17 +99,6 @@ function onRoute(next) {
     show('grid');
     setHeader({ sheet: `M${meeting.no}`, title: `${meeting.title} · ${meeting.titleTh || ''}` });
     renderGrid(meeting);
-    return;
-  }
-
-  if (route.itemId === COMPARE_ID) {
-    if (!hasCompare(meeting)) {
-      go({ view: 'meeting', meetingId: meeting.id }, { replace: true });
-      return;
-    }
-    show('compare');
-    setHeader({ sheet: `M${meeting.no}`, title: `เทียบทางเลือก · Compare` });
-    renderCompare(views.compare, meeting);
     return;
   }
 
@@ -144,13 +122,11 @@ function onRoute(next) {
   app.dataset.mode = mode;
   setHeader({
     sheet: item.sheet,
-    title: item.tagline ? `${item.label} · ${item.tagline}` : item.label,
+    title: item.label,
     item,
     mode,
     modes,
   });
-
-  setNotes(item, meeting);
 
   // Only touch a pane that is actually on screen — a hidden model must not
   // download or build.
@@ -169,19 +145,12 @@ function latestReady() {
   return [...data.meetings].reverse().find((m) => m.status === 'ready') ?? null;
 }
 
-function setNotesOpen(open) {
-  notesOpen = open && route?.view === 'item';
-  showNotes(notesOpen);
-  header.notes.setAttribute('aria-pressed', String(notesOpen));
-}
-
 function setHeader({ sheet, title, item = null, mode = null, modes = MODES }) {
   header.sheet.textContent = sheet || '';
   header.title.textContent = title || '';
 
   header.switcher.hidden = !item;
   header.links.hidden = !item;
-  header.notes.hidden = !(item && notesAvailable(item));
 
   for (const btn of header.switcher.querySelectorAll('button')) {
     const m = btn.dataset.mode;
@@ -198,13 +167,13 @@ function setHeader({ sheet, title, item = null, mode = null, modes = MODES }) {
 }
 
 function renderGrid(meeting) {
-  const floors = (it) => (it.pages?.length
+  // Sheets with more than one page say so, so the client knows to expect the
+  // floor switcher rather than hunting for the upper floor.
+  const floors = (it) => (it.pages?.length > 1
     ? `<span class="card__floors">${it.pages.map((p) => esc(p.label)).join(' · ')}</span>`
     : '');
 
   views.grid.innerHTML = `
-    ${meeting.brief ? `<p class="grid__brief">${esc(meeting.brief)}</p>` : ''}
-
     <ul class="grid">
       ${meeting.items.map((it) => `
         <li>
@@ -218,35 +187,11 @@ function renderGrid(meeting) {
             <span class="card__meta">
               <span class="mono card__sheet">${esc(it.sheet)}</span>
               <span class="card__label">${esc(it.label)}</span>
-              ${it.tagline ? `<span class="card__tagline">${esc(it.tagline)}</span>` : ''}
               ${floors(it)}
             </span>
           </a>
         </li>`).join('')}
-    </ul>
-
-    ${hasCompare(meeting) ? `
-      <a class="grid__compare" href="#/${meeting.id}/${COMPARE_ID}">
-        <span class="mono">01–0${meeting.items.length}</span>
-        <span>เทียบ ${meeting.items.length} ทางเลือกด้วย 4 แกนเดียวกัน
-          <small>Compare every option on the same four questions</small></span>
-        <span class="grid__go" aria-hidden="true">→</span>
-      </a>` : ''}
-
-    ${meeting.docs?.length ? `
-      <section class="grid__docs">
-        <h3>เอกสารประกอบ <small>Sheets from the printed set</small></h3>
-        <ul class="docs">
-          ${meeting.docs.map((d) => `
-            <li>
-              <a href="${esc(d.file)}" target="_blank" rel="noopener">
-                <span class="docs__label">${esc(d.label)}</span>
-                ${d.sub ? `<span class="docs__sub mono">${esc(d.sub)}</span>` : ''}
-                <span class="docs__go" aria-hidden="true">↗</span>
-              </a>
-            </li>`).join('')}
-        </ul>
-      </section>` : ''}`;
+    </ul>`;
 }
 
 function fatal(msg) {

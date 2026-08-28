@@ -38,13 +38,6 @@ function validateItem(item, meetingId, i) {
     need(typeof p.label === 'string' && p.label, `${where}.pages[${k}].label is required`);
   });
 
-  const axes = Array.isArray(item.axes) ? item.axes : [];
-  axes.forEach((a, k) => {
-    need(a && typeof a === 'object', `${where}.axes[${k}] is not an object`);
-    need(Array.isArray(a.pros) && Array.isArray(a.cons),
-      `${where}.axes[${k}] needs both a "pros" and a "cons" array`);
-  });
-
   return {
     id: item.id,
     label: item.label,
@@ -55,17 +48,9 @@ function validateItem(item, meetingId, i) {
     modelUp: item.modelUp || 'Y',
     modelScale: item.modelScale ?? 1,
 
-    // From M2 on. All optional, so an M1-shaped item still validates.
-    tagline: item.tagline || '',
-    origin: item.origin || '',
+    // Optional, and only where a sheet has more than one page: names the pages
+    // so the plan strip reads "ชั้น 1 / ชั้น 2" instead of "1 / 2".
     pages: pages.map((p) => ({ no: p.no, label: p.label, sub: p.sub || '' })),
-    areas: Array.isArray(item.areas) ? item.areas : [],
-    axes: axes.map((a, k) => ({
-      n: a.n ?? k + 1,
-      pros: a.pros.map(String),
-      cons: a.cons.map(String),
-    })),
-    verdict: item.verdict || '',
   };
 }
 
@@ -79,12 +64,6 @@ function validateMeeting(m, i) {
   need(m.status !== 'ready' || items.length > 0,
     `${where} is marked "ready" but has no items`);
 
-  const docs = Array.isArray(m.docs) ? m.docs : [];
-  docs.forEach((d, k) => {
-    need(d && typeof d === 'object' && d.file && d.label,
-      `${where}.docs[${k}] needs a "label" and a "file"`);
-  });
-
   const meeting = {
     id: m.id,
     no: m.no ?? i + 1,
@@ -95,9 +74,6 @@ function validateMeeting(m, i) {
     // Which feedback sheet this meeting asks for: "rank" is M1's top-3 /
     // dropped-3, "choose" is M2's pick-one-and-say-why.
     feedbackForm: m.feedbackForm === 'choose' ? 'choose' : 'rank',
-    brief: m.brief || '',
-    axes: Array.isArray(m.axes) ? m.axes : [],
-    docs: docs.map((d) => ({ id: d.id || d.file, label: d.label, sub: d.sub || '', file: d.file })),
     items: items.map((it, j) => validateItem(it, m.id, j)),
   };
 

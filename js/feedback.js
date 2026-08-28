@@ -123,8 +123,6 @@ function templateChoose() {
               <span class="pick__body">
                 <span class="mono pick__sheet">${esc(it.sheet)}</span>
                 <span class="pick__label">${esc(it.label)}</span>
-                ${it.tagline ? `<span class="pick__tagline">${esc(it.tagline)}</span>` : ''}
-                ${it.origin ? `<span class="pick__origin">${esc(it.origin)}</span>` : ''}
               </span>
             </label>
           </li>`).join('')}
@@ -417,8 +415,7 @@ function showSavedStamp(iso) {
 
 function labelFor(id) {
   const it = items.find((x) => x.id === id);
-  if (!it) return '—';
-  return it.tagline ? `${it.sheet} ${it.label} · ${it.tagline}` : `${it.sheet} ${it.label}`;
+  return it ? `${it.sheet} ${it.label}` : '—';
 }
 
 function asText() {

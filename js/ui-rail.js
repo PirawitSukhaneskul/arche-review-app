@@ -55,24 +55,7 @@ export function renderRail(data, route) {
           a.setAttribute('aria-current', 'true');
         }
         a.innerHTML = `<span class="mono option__sheet">${esc(it.sheet)}</span>
-                       <span class="option__label">${esc(it.label)}
-                         ${it.tagline ? `<small>${esc(it.tagline)}</small>` : ''}</span>`;
-        li.append(a);
-        ul.append(li);
-      }
-
-      // Meetings that carry the four-axis notes also get the comparison sheet.
-      if (m.items.some((it) => it.axes?.length)) {
-        const li = document.createElement('li');
-        const a = document.createElement('a');
-        a.className = 'option option--compare';
-        a.href = hashFor({ view: 'item', meetingId: m.id, itemId: 'compare' });
-        if (activeItem === 'compare') {
-          a.classList.add('is-active');
-          a.setAttribute('aria-current', 'true');
-        }
-        a.innerHTML = `<span class="mono option__sheet">≡</span>
-                       <span class="option__label">เทียบทางเลือก<small>Compare</small></span>`;
+                       <span class="option__label">${esc(it.label)}</span>`;
         li.append(a);
         ul.append(li);
       }

@@ -132,60 +132,26 @@ PDF and the plan pane's strip becomes a floor switcher:
 | 2 | 5–6 | `assets/meeting-2/plans/opt-2.pdf` |
 | 3 | 7–8 | `assets/meeting-2/plans/opt-3.pdf` |
 
-Pages 2, 9, 10 and 11–12 (brief, comparison table, cost frame, printed decision
-sheet) are split out to `assets/meeting-2/docs/`, which is **gitignored** — the
-repo is public, and the cost frame and the signature sheet are not for the open
-web. They stay local; the app links them only if a `docs` array is present on
-the meeting in the manifest, which it deliberately is not. Re-split with:
+Deck pages 2, 9, 10 and 11–12 (brief, comparison table, cost frame, printed
+decision sheet) are **not** part of the app — this platform is for reading the
+plan against the model, and those pages are paper. If they are ever split out,
+keep them out of the repo: it is public, and the cost frame and the signature
+sheet are not for the open web.
 
-```python
-import pymupdf
-src = pymupdf.open('Arche_Aquatics_Meeting2_3Options.pdf')
-for opt, (a, b) in {1: (2, 3), 2: (4, 5), 3: (6, 7)}.items():   # 0-based
-    out = pymupdf.open()
-    out.insert_pdf(src, from_page=a, to_page=b)
-    out.save(f'assets/meeting-2/plans/opt-{opt}.pdf', garbage=4, deflate=True)
-```
+### Multi-page sheets
 
-These sheets carry no 3D massing block, so the M2 thumbnails are a crop of the
-ชั้น 1 drawing area instead:
-
-```python
-clip = pymupdf.Rect(380, 140, 1170, 650)          # the drawing, minus the notes column
-pix = src[2].get_pixmap(clip=clip, matrix=pymupdf.Matrix(480 / clip.width, 480 / clip.width))
-```
-
-### The four-axis notes (M2 onwards)
-
-Everything in an option sheet's left-hand column also lives in the manifest, as
-text, so the app can show it at any zoom and compare options side by side. The
-extra item fields are all optional — an M1-shaped item with none of them still
-validates:
+An item whose sheet has more than one page names them with `pages`, and the
+plan strip becomes a floor switcher instead of page numbers:
 
 ```json
-"tagline": "คุมทั้งสองสระ + one-way",
-"origin":  "พัฒนาจาก OPTION 4 (Meeting 1)",
-"pages":   [{ "no": 1, "label": "ชั้น 1", "sub": "Ground floor" },
-            { "no": 2, "label": "ชั้น 2", "sub": "Upper floor" }],
-"areas":   [{ "label": "พื้นที่อาคาร ชั้น 1 + ชั้น 2", "value": "538.7", "unit": "ตร.ม." }],
-"axes":    [{ "n": 1, "pros": ["…"], "cons": ["…"] }],
-"verdict": "สรุปในมุมของสถาปนิก …"
+"pages": [{ "no": 1, "label": "ชั้น 1", "sub": "Ground floor" },
+          { "no": 2, "label": "ชั้น 2", "sub": "Upper floor" }]
 ```
 
-The axis *titles* sit on the meeting, not the item, because all three options
-are judged on the same four questions:
-
-```json
-"axes": [{ "n": 1, "title": "สายตาเจ้าหน้าที่", "sub": "จากที่นั่งประจำ มองเห็นอะไร" }],
-"docs": [{ "id": "compare", "label": "ตารางเทียบ 3 ทางเลือก", "sub": "หน้า 9",
-           "file": "assets/meeting-2/docs/compare.pdf" }],
-"brief": "…",
-"feedbackForm": "choose"
-```
-
-`pages` drives the floor strip, `axes` + `areas` + `verdict` drive the
-**ข้อดี / ข้อเสีย** panel (the header toggle, or `Esc` to close) and the compare
-view at `#/<meeting>/compare`.
+Leave `pages` out and a multi-page PDF still works — the strip just shows
+`1 2`. This is the only field M2 adds to an item; everything else about the
+option (areas, ข้อดี/ข้อเสีย, the architect's read) stays on the drawing where
+it was drawn, not duplicated into the app.
 
 ### Which feedback sheet a meeting asks for
 

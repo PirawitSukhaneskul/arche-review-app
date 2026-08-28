@@ -113,7 +113,8 @@ function init() {
       <button type="button" data-act="proj" aria-pressed="true">Ortho</button>
       <button type="button" data-act="edges" aria-pressed="true">Edges</button>
       <button type="button" data-act="display" aria-expanded="false"
-              aria-controls="model-display" title="ภาพ / Contrast + saturation">◐</button>
+              aria-controls="model-display" aria-label="ปรับภาพ / Display settings"
+              title="ภาพ / Contrast + saturation">◐</button>
       <button type="button" data-act="full" aria-label="เต็มจอ / Fullscreen">⤢</button>
     </div>
 
