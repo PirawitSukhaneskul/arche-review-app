@@ -139,6 +139,41 @@ plan against the model, and those pages are paper. If they are ever split out,
 keep them out of the repo: it is public, and the cost frame and the signature
 sheet are not for the open web.
 
+### Where the Meeting 3 sheets came from
+
+`Submission/Arche_Aquatics_M3_DesignDevelopment.pdf` is 8 pages of A3 landscape
+— one developed design, not a comparison, so M3 has a single item:
+
+| Item | Deck pages | File |
+| --- | --- | --- |
+| `dev-1` | 3–4 (ชั้น 1, ชั้น 2) | `assets/meeting-3/plans/dev-1.pdf` |
+
+The card thumbnail is the isometric on deck page 5, cropped out of the rendered
+page and fitted to 480×310 on white.
+
+Deck pages 2, 6, 7 and 8 (what changed from M2, the room-by-room area table,
+the cost estimate and the printed confirmation sheet) are **not** part of the
+app, and pages 7–8 in particular must stay out of the repo — it is public, and
+the cost frame and the signature sheet with the bank account are not for the
+open web.
+
+### The M3 model carries scrap geometry
+
+The SketchUp file keeps the imported CAD linework parked beside the building —
+157 flat draws at z = 0, starting about 16,000 units east, which is six times
+wider than the site. The viewer fits the camera to the model's bounding box, so
+with the scrap in place the building renders as a thumbnail in the corner. The
+copy in the repo has it removed: walk the visual scene, and drop any `<node>`,
+`<instance_geometry>` or `<instance_node>` whose world-space bounds sit entirely
+past x = 8000. Resolving `<instance_node>` through `<library_nodes>` matters —
+most of the scrap is component instances, not direct geometry. After the strip,
+the model's bounds match M2's site exactly (3206 × 1868 × 753).
+
+The main roof reads blue-grey in the viewer because the texture named
+`Roofing_Metal_Standing_Seam_Red.jpg` is itself blue-grey; the deck's page-5
+render shows it white. The viewer is faithful to the model — fix it in SketchUp
+if the white roof is the intent.
+
 ### Multi-page sheets
 
 An item whose sheet has more than one page names them with `pages`, and the
@@ -150,7 +185,7 @@ plan strip becomes a floor switcher instead of page numbers:
 ```
 
 Leave `pages` out and a multi-page PDF still works — the strip just shows
-`1 2`. This is the only field M2 adds to an item; everything else about the
+`1 2`. This is the only field M2 and M3 add to an item; everything else about the
 option (areas, ข้อดี/ข้อเสีย, the architect's read) stays on the drawing where
 it was drawn, not duplicated into the app.
 
@@ -163,6 +198,7 @@ sheet:
 | --- | --- |
 | `"rank"` | M1 — top three, three dropped, why (the default) |
 | `"choose"` | M2 — pick one option to develop, what to keep, what to fix |
+| `"confirm"` | M3 — sign the design off, or say what still needs work |
 
 Each meeting keeps its own draft in `localStorage` and its own URL
 (`#/m2/feedback`); bare `#/feedback` opens the newest ready meeting's sheet, and

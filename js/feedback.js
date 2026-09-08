@@ -6,11 +6,14 @@ import { esc } from './ui-rail.js';
  * so the two match one-for-one — and each meeting prints its own sheet:
  *
  *   "rank"   M1 · six layouts   → top three, three dropped, why
- *   "choose" M2 · three options → pick one to develop, what to keep, what to fix
+ *   "choose"  M2 · three options → pick one to develop, what to keep, what to fix
+ *   "confirm" M3 · one developed design → sign it off, or say what still needs work
  *
  * Every path out of here works with no network: autosave to localStorage,
  * print to PDF, Copy as text, and a pre-filled mailto: as the last resort.
  */
+
+const SHAPES = new Set(['rank', 'choose', 'confirm']);
 
 const TOP_N = 3;
 const DROP_N = 3;
@@ -27,11 +30,11 @@ export function renderFeedback(container, data, forMeeting = null) {
   meeting = forMeeting
     ?? [...data.meetings].reverse().find((m) => m.status === 'ready')
     ?? data.meetings[0];
-  shape = meeting.feedbackForm === 'choose' ? 'choose' : 'rank';
+  shape = SHAPES.has(meeting.feedbackForm) ? meeting.feedbackForm : 'rank';
   items = meeting.items ?? [];
   state = restore() ?? blank();
 
-  host.innerHTML = shape === 'choose' ? templateChoose() : template();
+  host.innerHTML = TEMPLATES[shape]();
   bind();
   hydrate();
   if (shape === 'rank') refreshOptionLists();
@@ -62,6 +65,16 @@ function today() {
 }
 
 function blank() {
+  if (shape === 'confirm') {
+    return {
+      name: '',
+      date: today(),
+      verdict: '',
+      fix: '',
+      comments: '',
+      savedAt: null,
+    };
+  }
   if (shape === 'choose') {
     return {
       name: '',
@@ -81,6 +94,103 @@ function blank() {
     comments: '',
     savedAt: null,
   };
+}
+
+/**
+ * M3's sheet: the round closes with a decision, not a preference — sign the
+ * design off, or say what still needs work. Mirrors the printed confirmation
+ * sheet on the last page of the M3 set.
+ */
+function templateConfirm() {
+  const verdicts = [
+    {
+      value: 'confirm',
+      label: 'ยืนยันแบบ M3 ตามชุดนี้',
+      sub: 'ผังชั้น 1 และชั้น 2 ตามชุดแบบนี้ · เริ่มขั้นจัดทำ BOQ ได้',
+    },
+    {
+      value: 'revise',
+      label: 'ยังมีจุดที่อยากแก้',
+      sub: 'เขียนรายละเอียดในช่องด้านล่าง',
+    },
+  ];
+
+  return `
+  <form class="fb" id="fb-form" novalidate>
+    <header class="fb__head">
+      <span class="mono fb__tag">FB-0${esc(meeting.no)}</span>
+      <h2>ยืนยันแบบ หรือแจ้งจุดที่อยากแก้
+        <small>${esc(meetingName())}</small></h2>
+      <p class="fb__saved mono" id="fb-saved" aria-live="polite"></p>
+    </header>
+
+    <p class="fb__hint">แบบชุดนี้พัฒนาต่อจาก OPTION 3 ของรอบที่แล้ว
+      อ่านผังชั้น 1 และชั้น 2 เทียบกับโมเดล 3 มิติ แล้วเลือกอย่างใดอย่างหนึ่งด้านล่าง</p>
+
+    <div class="fb__row">
+      <label class="field">
+        <span class="field__label">ผู้ให้ความเห็น <small>Name</small> <b aria-hidden="true">*</b></span>
+        <input type="text" id="fb-name" name="name" required autocomplete="name">
+        <span class="field__err" id="err-name" hidden>กรุณากรอกชื่อ / Name is required</span>
+      </label>
+      <label class="field field--sm">
+        <span class="field__label">วันที่ <small>Date</small></span>
+        <input type="date" id="fb-date" name="date" class="mono">
+      </label>
+    </div>
+
+    <fieldset class="fb__set">
+      <legend><span class="mono">A</span> ผลการพิจารณา <small>Decision</small> <b aria-hidden="true">*</b></legend>
+      <ul class="picks">
+        ${verdicts.map((v) => `
+          <li>
+            <label class="pick">
+              <input type="radio" name="verdict" value="${esc(v.value)}" data-role="verdict">
+              <span class="pick__body pick__body--stack">
+                <span class="pick__label">${esc(v.label)}</span>
+                <span class="pick__sub">${esc(v.sub)}</span>
+              </span>
+            </label>
+          </li>`).join('')}
+      </ul>
+      <p class="fb__err" id="err-verdict" hidden>เลือก 1 ข้อ / Pick one</p>
+    </fieldset>
+
+    <label class="field">
+      <span class="field__label"><span class="mono">B</span> สิ่งที่อยากแก้ หรือยังไม่มั่นใจ
+        <small>What to fix, or still unsure about</small></span>
+      <textarea rows="5" id="fb-fix"></textarea>
+      <span class="field__err" id="err-fix" hidden>เขียนจุดที่อยากแก้ / Say what needs work</span>
+    </label>
+
+    <label class="field">
+      <span class="field__label"><span class="mono">C</span> คำถามถึงผู้ออกแบบ
+        <small>Questions for the architect</small></span>
+      <textarea rows="4" id="fb-comments"></textarea>
+    </label>
+
+    <!-- honeypot: real people never see this, bots fill it in -->
+    <div class="hp" aria-hidden="true">
+      <label>Company website<input type="text" id="fb-hp" name="_gotcha" tabindex="-1" autocomplete="off"></label>
+    </div>
+
+    <div class="fb__actions">
+      <button type="button" class="btn" data-act="pdf">ดาวน์โหลด PDF · Download PDF</button>
+      <button type="submit" class="btn btn--primary" id="fb-submit">ส่งเมล์ · Send</button>
+    </div>
+
+    <p class="fb__status" id="fb-status" role="status" aria-live="polite"></p>
+
+    <div class="fb__fallback" id="fb-fallback" hidden>
+      <p>ส่งไม่สำเร็จ แต่ข้อมูลยังอยู่ครบ · The send failed, nothing was lost.</p>
+      <div class="fb__actions">
+        <a class="btn" id="fb-mailto" href="#">เปิดอีเมล · Open email</a>
+        <button type="button" class="btn" data-act="copy">คัดลอกข้อความ · Copy as text</button>
+      </div>
+    </div>
+
+    <div class="fb__receipt" id="fb-receipt" hidden></div>
+  </form>`;
 }
 
 /**
@@ -264,6 +374,12 @@ function template() {
   </form>`;
 }
 
+const TEMPLATES = {
+  rank: template,
+  choose: templateChoose,
+  confirm: templateConfirm,
+};
+
 /* ── wiring ──────────────────────────────────────────────────────────────── */
 
 function bind() {
@@ -290,6 +406,7 @@ function onInput(e) {
   else if (t.id === 'fb-keep') state.keep = t.value;
   else if (t.id === 'fb-fix') state.fix = t.value;
   else if (role === 'choice') state.choice = t.value;
+  else if (role === 'verdict') state.verdict = t.value;
   else if (role === 'top-option') { state.top[+t.dataset.i].option = t.value; autoFillDropped(); }
   else if (role === 'top-like') state.top[+t.dataset.i].like = t.value;
   else if (role === 'top-dislike') state.top[+t.dataset.i].dislike = t.value;
@@ -310,6 +427,14 @@ function hydrate() {
   host.querySelector('#fb-name').value = state.name;
   host.querySelector('#fb-date').value = state.date;
   host.querySelector('#fb-comments').value = state.comments;
+
+  if (shape === 'confirm') {
+    host.querySelector('#fb-fix').value = state.fix;
+    const picked = q(`[data-role="verdict"][value="${CSS.escape(state.verdict || ' ')}"]`);
+    if (picked) picked.checked = true;
+    updateMailto();
+    return;
+  }
 
   if (shape === 'choose') {
     host.querySelector('#fb-keep').value = state.keep;
@@ -395,7 +520,7 @@ function restore() {
     if (!raw) return null;
     const s = JSON.parse(raw);
     const base = blank();
-    if (shape === 'choose') return { ...base, ...s };
+    if (shape !== 'rank') return { ...base, ...s };
     return {
       ...base, ...s,
       top: base.top.map((b, i) => ({ ...b, ...(s.top?.[i] || {}) })),
@@ -418,6 +543,12 @@ function labelFor(id) {
   return it ? `${it.sheet} ${it.label}` : '—';
 }
 
+function verdictText() {
+  if (state.verdict === 'confirm') return 'ยืนยันแบบ M3 ตามชุดนี้ / Approved';
+  if (state.verdict === 'revise') return 'ยังมีจุดที่อยากแก้ / Revisions requested';
+  return '—';
+}
+
 function asText() {
   const L = [];
   L.push('ARCHE AQUATICS — CLIENT FEEDBACK');
@@ -426,6 +557,18 @@ function asText() {
   L.push(`ผู้ให้ความเห็น / Name : ${state.name || '—'}`);
   L.push(`วันที่ / Date        : ${state.date || '—'}`);
   L.push('');
+
+  if (shape === 'confirm') {
+    L.push('— ผลการพิจารณา / DECISION —');
+    L.push(verdictText());
+    L.push('');
+    L.push('— สิ่งที่อยากแก้ หรือยังไม่มั่นใจ / WHAT TO FIX —');
+    L.push(state.fix || '—');
+    L.push('');
+    L.push('— คำถามถึงผู้ออกแบบ / QUESTIONS —');
+    L.push(state.comments || '—');
+    return L.join('\n');
+  }
 
   if (shape === 'choose') {
     L.push('— ทางเลือกที่เลือก / OPTION TO DEVELOP —');
@@ -471,6 +614,15 @@ function payload() {
     submittedAt: new Date().toISOString(),
     text: asText(),
   };
+
+  if (shape === 'confirm') {
+    return {
+      ...common,
+      verdict: state.verdict,
+      verdictLabel: verdictText(),
+      fix: state.fix,
+    };
+  }
 
   if (shape === 'choose') {
     return {
@@ -552,6 +704,26 @@ function downloadPdf() {
       WIN ARCHITECT · พีรวิชญ์ สุขเณศกุล · ${esc(state.date || '')}
     </footer>`;
 
+  if (shape === 'confirm') {
+    sheet.innerHTML = `
+      ${head}
+
+      <h2><span class="mono">A</span> ผลการพิจารณา <small>Decision</small></h2>
+      <p class="ps__choice mono">${esc(verdictText())}</p>
+
+      <h2><span class="mono">B</span> สิ่งที่อยากแก้ หรือยังไม่มั่นใจ <small>What to fix</small></h2>
+      <p class="ps__comments">${esc(state.fix || '—')}</p>
+
+      <h2><span class="mono">C</span> คำถามถึงผู้ออกแบบ <small>Questions</small></h2>
+      <p class="ps__comments">${esc(state.comments || '—')}</p>
+
+      ${foot}`;
+
+    status('เลือก “Save as PDF” ในหน้าต่างพิมพ์ · Choose “Save as PDF” in the print dialog', 'ok');
+    window.print();
+    return;
+  }
+
   if (shape === 'choose') {
     sheet.innerHTML = `
       ${head}
@@ -631,6 +803,20 @@ function validate() {
   const nameErr = host.querySelector('#err-name');
   nameErr.hidden = !!state.name.trim();
   if (!state.name.trim()) { ok = false; host.querySelector('#fb-name').focus(); }
+
+  if (shape === 'confirm') {
+    const verdictErr = host.querySelector('#err-verdict');
+    verdictErr.hidden = !!state.verdict;
+    if (!state.verdict) ok = false;
+
+    // "ยังมีจุดที่อยากแก้" with nothing written is not an answer we can act on.
+    const fixErr = host.querySelector('#err-fix');
+    const needsFix = state.verdict === 'revise' && !state.fix.trim();
+    fixErr.hidden = !needsFix;
+    if (needsFix) ok = false;
+
+    return ok;
+  }
 
   if (shape === 'choose') {
     const choiceErr = host.querySelector('#err-choice');

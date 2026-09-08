@@ -159,9 +159,34 @@
       "id": "m3",
       "no": 3,
       "title": "Design development",
-      "titleTh": "พัฒนาแบบ",
-      "status": "pending",
-      "items": []
+      "titleTh": "พัฒนาแบบที่เลือก 1 แบบ",
+      "status": "ready",
+      "date": "2026-09-07",
+      "feedbackForm": "confirm",
+      "items": [
+        {
+          "id": "dev-1",
+          "label": "OP3 · แบบพัฒนา",
+          "sheet": "M3-01",
+          "plan": "assets/meeting-3/plans/dev-1.pdf",
+          "model": "assets/meeting-3/models/dev-1.dae",
+          "thumb": "assets/meeting-3/thumbs/dev-1.png",
+          "modelUp": "Z",
+          "modelScale": 1,
+          "pages": [
+            {
+              "no": 1,
+              "label": "ชั้น 1",
+              "sub": "Ground floor"
+            },
+            {
+              "no": 2,
+              "label": "ชั้น 2",
+              "sub": "Upper floor"
+            }
+          ]
+        }
+      ]
     },
     {
       "id": "m4",

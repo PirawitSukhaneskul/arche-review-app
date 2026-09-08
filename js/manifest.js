@@ -7,6 +7,7 @@ import { CONFIG } from './config.js';
 
 const VALID_STATUS = new Set(['ready', 'pending']);
 const VALID_UP = new Set(['Y', 'Z']);
+const VALID_FORM = new Set(['rank', 'choose', 'confirm']);
 
 class ManifestError extends Error {}
 
@@ -72,8 +73,9 @@ function validateMeeting(m, i) {
     date: m.date || '',
     status: m.status,
     // Which feedback sheet this meeting asks for: "rank" is M1's top-3 /
-    // dropped-3, "choose" is M2's pick-one-and-say-why.
-    feedbackForm: m.feedbackForm === 'choose' ? 'choose' : 'rank',
+    // dropped-3, "choose" is M2's pick-one-and-say-why, "confirm" is M3's
+    // sign-it-off-or-say-what-to-fix.
+    feedbackForm: VALID_FORM.has(m.feedbackForm) ? m.feedbackForm : 'rank',
     items: items.map((it, j) => validateItem(it, m.id, j)),
   };
 
